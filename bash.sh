@@ -2,12 +2,11 @@
 
 make
 
-directory="Falkenauer_CSP/Falkenauer_T/"
-
 sum=0
 counter=0
 
-for file in ${directory}Falkenauer_t60_{00..19}.txt; do
+for i in {0..19}; do
+    file="Falkenauer_CSP/Falkenauer_T/Falkenauer_t60_$(printf "%02d" $i).txt"
     if [ -f "$file" ]; then
         counter=$((counter + 1))
         
