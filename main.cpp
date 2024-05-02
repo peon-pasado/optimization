@@ -7,19 +7,25 @@
 #include <cmath>
 #include <set>
 #include <utility>
+#include <stack>
 using namespace std;
 
-const double EPS = 1e-5;
+const double EPS = 1e-7;
 inline bool isInteger(float x) { return abs(floor(x) - x) <= EPS; }
+using v_x = vector<tuple<int, int, double>>;
+using setg = set<pair<int, int>, greater<pair<int, int>>>;
 
-const int maxn = 1010;
+
+const int maxn = 1110;
 int b[maxn];
 int n, W;
 int w[maxn];
 
-vector<pair<int, int>> edges;
+set<pair<int, int>> edges;
 bool used[maxn];
 int head[maxn];
+stack<int> L[maxn * maxn], R[maxn * maxn];
+const double eps = 1e-6;
 
 string val(int x) {
      static const string dic = "0123456789abcdef";
@@ -68,15 +74,17 @@ int main(int argc, char *argv[]) {
      GRBEnv env = GRBEnv(true);
      env.set("LogFile", "branch_and_price.log");
      env.set(GRB_IntParam_OutputFlag, 0);
+ 
      env.start();
-    
-     GRBModel model = GRBModel(env);    
+     const int INF = 1e8;
 
      {
+          b[0] = b[1];
           auto create = [&](int i, int j) {
                if (j - i == 1) used[i] = 1;
-               edges.emplace_back(i, j);
-               //model.addVar(0.0, GRB_INFINITY, 0.0, GRB_CONTINUOUS, x(i, j));
+               edges.emplace(i, j);
+               L[i * (W + 1) + j].push(0);
+               R[i * (W + 1) + j].push(INF); 
           };
 
           head[0] = 1e9;
@@ -95,96 +103,109 @@ int main(int argc, char *argv[]) {
                }
           }         
 
+          //2 
           for (int i=W-1; i >= minW; --i) {
                if (used[i]) continue;
                create(i, i+1);
           }
-
-          GRBVar z = model.addVar(0.0, GRB_INFINITY, 1.0, GRB_CONTINUOUS, x(W, 0));
-          for (int d = 1; d <= W; ++d) {
-               if (d > 1 && b[d] == 0) continue;
-               GRBLinExpr Ad = model.addVar(0.0, GRB_INFINITY, 1e9, GRB_CONTINUOUS);
-               model.update();
-               model.addConstr(Ad >= b[d], demand(d));
-          }
-          model.addConstr(z == 0, flow(0));
-          model.addConstr(-z == 0, flow(W));
      }
-     model.update();
+     auto make_model = [&](GRBModel& model, setg& edges_id, set<int>& nodes, vector<int> col, bool is_new) {
+          if (is_new) {
+               GRBVar z = model.addVar(0, GRB_INFINITY, 1, GRB_CONTINUOUS, x(W, 0));
+               for (int d = 1; d <= W; ++d) {
+                    if (d > 1 && b[d] == 0) continue;
+                    GRBLinExpr Ad = model.addVar(0, GRB_INFINITY, INF, GRB_CONTINUOUS);
+                    model.update();
+                    model.addConstr(Ad >= b[d], demand(d));
+               }
+               nodes.emplace(0); nodes.emplace(W);
+               model.addConstr(z == 0, flow(0));
+               model.addConstr(-z == 0, flow(W));
+               model.update();
+          }
 
-     auto get_solution = [&](GRBModel& model, set<pair<int, int>>& edges_id) {
-          int u=0, v=0;
-          float w=0, z = model.get(GRB_DoubleAttr_ObjVal);
-          for (auto [i, j] : edges_id) {
-               float r = model.getVarByName(x(i, j)).get(GRB_DoubleAttr_X);
-               if (r > 1e-8 && !isInteger(r)) {
-                    u = i; v = j; w = r;
-                    break;
+          vector<pair<int, int>> new_edges;
+          if (is_new) {
+               for (auto e : edges_id) new_edges.emplace_back(e);
+          } else {
+               for (int k = 1; k < (int)col.size(); ++k) {
+                    int i = col[k - 1];
+                    int j = col[k];
+                    if (edges_id.count({i, j})) continue;
+                    edges_id.insert({i, j});
+                    new_edges.emplace_back(i, j);
                }
           }
-          return tuple<float, float, int, int>(z, w, u, v);
-     };
-     auto modify = [&](GRBModel& model, const vector<int>& nodes, set<pair<int, int>>& edges_id) {
-          for (int i=1; i<(int)nodes.size(); ++i) {
-               int u = nodes[i-1], v = nodes[i];
-               if (edges_id.count({u, v})) continue;
-               edges_id.insert({u, v});
-               GRBVar var;
-               //try {
-               //     var = model.getVarByName(x(u, v));
-               //} catch(...) {
-                    var = model.addVar(0.0, GRB_INFINITY, 0.0, GRB_CONTINUOUS, x(u, v));
+          for (auto [i, j] : new_edges) {
+               int v = i * (W + 1) + j;
+               int ll = L[v].top(), rr = R[v].top();
+               GRBVar var = model.addVar(0, GRB_INFINITY, 0, GRB_CONTINUOUS, x(i, j));
+               model.update();
+
+               if (!nodes.count(i)) {
+                    nodes.emplace(i);
+                    model.addConstr(-var == 0, flow(i));
                     model.update();
-               //}
-               
-               try {
-                    model.chgCoeff(model.getConstrByName(flow(u)), var, -1);
-               }  catch (GRBException e) {
-                    model.addConstr(-var == 0, flow(u));
-                    model.update();
+               } else {
+                    model.chgCoeff(model.getConstrByName(flow(i)), var, -1);
                }
 
-               try {
-                    model.chgCoeff(model.getConstrByName(flow(v)), var, 1);
-               } catch (GRBException e) {
-                    model.addConstr(var == 0, flow(v));
+               if (!nodes.count(j)) {
+                    nodes.emplace(j);                  
+                    model.addConstr(var == 0, flow(j));
                     model.update();
+               } else {
+                    model.chgCoeff(model.getConstrByName(flow(j)), var, 1);
                }
 
-               auto constr = model.getConstrByName(demand(v - u));
-               model.chgCoeff(constr, var, 1);
+               model.addConstr(var >= ll, l(i, j));
+               model.addConstr(var <= rr, r(i, j));
+               model.chgCoeff(model.getConstrByName(demand(j - i)), var, 1);
           }
           model.update();
      };
-     vector<vector<pair<int, double>>> G(W+1);
-     vector<float> dp(W+1);
-     vector<int> nxt(W+1);
-     auto create_graph = [&](GRBModel& model) {
-          //vector<vector<pair<int, double>>> g(W+1);
+
+     auto get_solution = [](GRBModel& model, setg& edges_id) {
+          v_x vars;
+          for (auto [i, j] : edges_id) {
+               double r = model.getVarByName(x(i, j)).get(GRB_DoubleAttr_X);
+               if (r > eps) {
+                    vars.emplace_back(i, j, r);
+               }
+          }
+          return vars;
+     };
+
+     auto longest_path = [&](GRBModel& model, setg& edges_id) {
+          int n = W+1;
+          const double inf = 1e8;
+          vector<vector<pair<int, double>>> G(n);
           for (auto [i, j] : edges) {
-               float c = -model.getConstrByName(demand(j - i)).get(GRB_DoubleAttr_Pi);
-               try {
-                    c += model.getConstrByName(l(i, j)).get(GRB_DoubleAttr_Pi);
-               } catch(...) {
-
+               double c = 0;
+               c -= model.getConstrByName(demand(j - i)).get(GRB_DoubleAttr_Pi);
+               if (edges_id.count({i, j})) {                        
+                    if (L[i * (W + 1) + j].size() > 1) {
+                         c += model.getConstrByName(l(i, j)).get(GRB_DoubleAttr_Pi);
+                    }
+                    if (R[i * (W + 1) + j].size() > 1) {
+                         c += -model.getConstrByName(r(i, j)).get(GRB_DoubleAttr_Pi);
+                    }
                }
-               try {
-                    c += -model.getConstrByName(r(i, j)).get(GRB_DoubleAttr_Pi);
-               } catch(...) {
-
-               }
-               //if (c > -1e-5) continue;
+               //if (c > 1e-8) continue;
                G[i].emplace_back(j, -c);
           }
-          return G;
-     };
-     auto longest_path = [&G, &nxt, &dp]() {
-          int n = G.size();
-          const float inf = 1e18;
-          //vector<float> dp(n, -inf);
-          //vector<int> nxt(n, -1);
-          fill(dp.begin(), dp.end(), -inf);
-          fill(nxt.begin(), nxt.end(), -1);
+
+          /**
+          for (int i=0; i<=W; ++i) {
+               if (G[i].empty()) continue;
+               cout << i << ": ";
+               for (auto [j, w] : G[i]) {
+                    cout << "(" << j << "," << w << ") ";
+               }
+               cout << endl;
+          }**/
+          vector<double> dp(n, -inf);
+          vector<int> nxt(n, -1);
           dp[n-1] = 0;
           for (int i=n-2; i>=0; --i) {
                for (auto [j, w] : G[i]) {
@@ -192,114 +213,132 @@ int main(int argc, char *argv[]) {
                     if (dp[i] < dp[j] + w) {
                          dp[i] = dp[j] + w;
                          nxt[i] = j;
-                    }
+                    } 
                }
           }
-          for (int i=0; i<n; ++i) {
-               G[i].clear();
-          }
-          if (dp[0] <= 1 + 1e-5) {
+          if (dp[0] - 1e-10 <= 1) {
                return vector<int>();
-          }
+          } 
           vector<int> nodes;
           int s = 0;
           while (s != -1) {
-               nodes.push_back(s);
+               nodes.emplace_back(s);
                s = nxt[s];
           }
           return nodes;
      };
-     auto gen_column = [&](GRBModel& model) {
-          create_graph(model);
-          return longest_path();
+     auto gen_column = [&](GRBModel& model, setg& edges_id) {
+          return longest_path(model, edges_id);
      };
      auto solve = [](GRBModel& model) {
-          model.update();
           model.optimize();
           return model.get(GRB_DoubleAttr_ObjVal);
      };
-     auto restricted_master = [&](GRBModel& model, int z_LB, set<pair<int, int>>& edges_id) {
+     auto restricted_master = [&](int z_LB, setg& edges_id) {
+          GRBModel model = GRBModel(env);
+          //model.getEnv().set(GRB_DoubleParam_FeasibilityTol, eps);
+          //model.getEnv().set(GRB_DoubleParam_OptimalityTol, eps);
+          set<int> nodes;
+          make_model(model, edges_id, nodes, {}, 1);
           double z_w = -1;
-          while ((z_w = solve(model)) > z_LB) {//z^w > z_LB
-               auto nodes = gen_column(model);
-               if (nodes.empty()) {
-                    if (z_LB == -1) break;
-                    return tuple<float, float, int, int>(z_w, -1, -1, -1);
+          while ((z_w = solve(model)) - 1e-8 > z_LB) {//z^w > z_LB
+               auto path = gen_column(model, edges_id);
+               if (path.empty()) {
+                    if (z_LB < 0) break;
+                    return make_pair(z_w, v_x());
                }
-               modify(model, nodes, edges_id);
+               make_model(model, edges_id, nodes, path, 0);
           }
-          return get_solution(model, edges_id);
+          return make_pair(z_w, get_solution(model, edges_id));
      };
-     auto reduce_loss = [&](GRBModel& model, int z, set<pair<int, int>>& edges_id) {
+
+     auto addUpper = [&](int i, int j, int r) {
+          int v = i * (W + 1) + j;
+          R[v].push(min(R[v].top(), r));
+     };
+
+     auto popUpper = [&](int i, int j) {
+          R[i * (W + 1) + j].pop();
+     };
+
+     auto addLower = [&](int i, int j, int l) {
+          int v = i * (W + 1) + j;
+          L[v].push(max(L[v].top(), l));
+     };
+
+     auto popLower = [&](int i, int j) {
+          L[i * (W + 1) + j].pop();
+     };
+
+     auto reduce_loss = [&](int z, setg& edges_id) {
           int lmin = z * W - sum;
-          auto constr = model.getConstrByName(demand(1));
+          vector<pair<int, int>> to_erase;
           for (auto [u, v] : edges) {
                if (u + 1 == v) {
-                    if (!edges_id.count({u, v})) continue;
                     if (u < W - lmin) {
-                         edges_id.erase({u, v});
-                         model.getVarByName(x(u, v)).set(GRB_DoubleAttr_Obj, GRB_INFINITY);
+                         to_erase.emplace_back(u, v);
                     } else {
-                         model.chgCoeff(constr, model.getVarByName(x(u, v)), 1);
+                         //edges_id.emplace(u, v);
                     }
                }
           }
-          constr.set(GRB_DoubleAttr_RHS, max(b[1], lmin));
-          model.update();
+          for (auto e : to_erase) {
+               edges.erase(e);
+               edges_id.erase(e);
+          }
+          b[1] = b[0] + lmin;
      };
-     bool found = false;
-     vector<vector<pair<int, int>>> g(W + 1);
-     auto bandp = [&](auto&& bandp, GRBModel& model, int z_LB, set<pair<int, int>> edges_id) {
-          if (found) return;
-          auto [z, w, u, v] = restricted_master(model, z_LB, edges_id);
-          if (v == -1) return;          
-          if (z_LB == -1) {
-               int z_LP = ceil(z - 1e-8);
-               while (!found) {
-                    //reduce_loss(model, z_LP, edges_id);
-                    GRBModel cmodel = model;
-                    bandp(bandp, cmodel, z_LP++, edges_id);
-               }
-          } else {
-               if (v == 0) {
-                    found = true;
-                    for (auto [i, j] : edges_id) {
-                         float r = model.getVarByName(x(i, j)).get(GRB_DoubleAttr_X);
-                         if (r > 1e-8) {
-                              g[i].emplace_back(j, round(r));
-                         }
-                    }
-                    return;
-               }
 
-               GRBModel model_ = model;
-               int L = floor(w) + 1;
-               try {
-                    model_.getConstrByName(l(u, v)).set(GRB_DoubleAttr_RHS, L);
-               } catch (GRBException e) {
-                    model_.addConstr(model.getVarByName(x(u, v)) >= L, l(u, v));
-                    model_.update();
+     vector<vector<pair<int, int>>> g(W + 1);
+     bool found = false;
+     auto bandp = [&](auto&& bandp, int z_LB, setg edges_id) {
+          if (found) return;
+          auto [z, solution] = restricted_master(z_LB, edges_id);
+                  
+          if (z_LB == -1) {
+               int z_LP = ceil(z - 1e-5);
+               while (!found) {
+                    reduce_loss(z_LP, edges_id);
+                    bandp(bandp, z_LP++, edges_id);
                }
-               bandp(bandp, model_, z_LB, edges_id);
-               int R = floor(w);
-               try {
-                    model.getConstrByName(r(u, v)).set(GRB_DoubleAttr_RHS, R);
-               } catch (GRBException e) {
-                    model.addConstr(model.getVarByName(x(u, v)) <= R, r(u, v));
-                    model.update(); 
-               }
-               bandp(bandp, model, z_LB, edges_id);               
-               
+               return;
+          } 
+          if (solution.empty()) return;  
+
+          int id = -1, d = -1;
+          for (int i=0; i<(int)solution.size(); ++i) {
+               auto [u, v, w] = solution[i];
+               if (!isInteger(w) && d < v - u) {
+                    id = i;
+                    d = v - u;
+               } 
           }
+
+          if (id == -1) {
+               found = true;
+               for (auto [i, j, c] : solution) {
+                    g[i].emplace_back(j, round(c));
+               }
+               return;
+          }
+
+          auto [u, v, w] = solution[id];
+          addUpper(u, v, floor(w));
+          bandp(bandp, z_LB, edges_id);
+          popUpper(u, v);
+
+          addLower(u, v, floor(w) + 1);
+          bandp(bandp, z_LB, edges_id);
+          popLower(u, v);
      };
-     set<pair<int, int>> s;
-     bandp(bandp, model, -1, s);
+     setg s;
+     bandp(bandp, -1, s);
      vector<int> bin;
      vector<vector<int>> bins;
      auto dfs = [&](auto&& dfs, int v, int last)->bool {
-          if (v != 0) bin.push_back(v - last);
+          if (v != 0) bin.emplace_back(v - last);
           if (v == W) {
-               bins.push_back(bin);
+               bins.emplace_back(bin);
                return true;
           }
           for (auto& [u, c] : g[v]) {
@@ -315,17 +354,21 @@ int main(int argc, char *argv[]) {
           return false;
      };
      while (dfs(dfs, 0, -1));
+     
+     cout << bins.size() << endl;
+     
+     b[1] = b[0];
      for (int i=0; i<(int)bins.size(); ++i) {
-          cout << "bin " << i + 1 << ": ";
+          //cout << "bin " << i + 1 << ": ";
           for (auto w : bins[i]) {
-               if (w == 1) {
-                    if (b[1] == 0) continue;
-                    b[1]--;
-               }
-               cout << w << " ";
+               if (b[w] == 0) continue;
+               b[w]--;
+               //cout << w << " ";
           }
-          cout << '\n';
+          //cout << '\n';
      }
+     for (int i=1; i<=W; ++i) assert(b[i] == 0);
+     
   } catch(GRBException e) {
     cout << "Error code = " << e.getErrorCode() << endl;
     cout << e.getMessage() << endl;
