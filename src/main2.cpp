@@ -57,6 +57,7 @@ string flow(int i) {
      return val(3 * (W + 1) * (W + 1) + (W + 1) + i);
 }
 
+
 int main(int argc, char *argv[]) {
      cin>>n>>W;
      int minW = W;
@@ -136,23 +137,30 @@ int main(int argc, char *argv[]) {
                     new_edges.emplace_back(i, j);
                }
           }
+
+          //[0, 2] [2, 3] [3, 10]
           for (auto [i, j] : new_edges) {
                int v = i * (W + 1) + j;
                int ll = L[v].top(), rr = R[v].top();
                GRBVar var = model.addVar(0, GRB_INFINITY, 0, GRB_CONTINUOUS, x(i, j));
                model.update();
 
+               // nodes = {0, 2, 3, 4, ..., W}
                if (!nodes.count(i)) {
                     nodes.emplace(i);
-                    model.addConstr(-var == 0, flow(i));
+                    model.addConstr(-var == 0, flow(i));  //-xij = 0
                     model.update();
                } else {
-                    model.chgCoeff(model.getConstrByName(flow(i)), var, -1);
+                    model.chgCoeff(model.getConstrByName(flow(i)), var, -1); // z - x02 == 0
+                    //x02 - x23 == 0
                }
 
+
+               // sum xij - sum xij --> -xij +xjl
                if (!nodes.count(j)) {
                     nodes.emplace(j);                  
-                    model.addConstr(var == 0, flow(j));
+                    model.addConstr(var == 0, flow(j)); //x02 == 0
+                    //x23 == 0
                     model.update();
                } else {
                     model.chgCoeff(model.getConstrByName(flow(j)), var, 1);
@@ -160,6 +168,7 @@ int main(int argc, char *argv[]) {
 
                model.addConstr(var >= ll, l(i, j));
                model.addConstr(var <= rr, r(i, j));
+               //A_d + xij + xlr + ... + >= 0
                model.chgCoeff(model.getConstrByName(demand(j - i)), var, 1);
           }
           model.update();
@@ -234,6 +243,7 @@ int main(int argc, char *argv[]) {
           model.optimize();
           return model.get(GRB_DoubleAttr_ObjVal);
      };
+     
      auto restricted_master = [&](int z_LB, setg& edges_id) {
           GRBModel model = GRBModel(env);
           //model.getEnv().set(GRB_DoubleParam_FeasibilityTol, eps);
@@ -251,10 +261,12 @@ int main(int argc, char *argv[]) {
           }
           return make_pair(z_w, get_solution(model, edges_id));
      };
+
      auto addUpper = [&](int i, int j, int r) {
           int v = i * (W + 1) + j;
           R[v].push(min(R[v].top(), r));
      };
+
      auto popUpper = [&](int i, int j) {
           R[i * (W + 1) + j].pop();
      };
