@@ -20,7 +20,7 @@ struct Problem {
         R.resize((W + 1) * (W + 1) + 1);
 
         for (auto [weight, count] : obj) {
-            b[weight] = count;
+            b[weight] += count;
         }
         sum = 0;
         for (int i=0; i<=W; ++i) {
@@ -42,7 +42,9 @@ struct Problem {
                 int c = 0;
                 for (int j=0; i + (j + 1)*d <= W; ++j) {
                         if (head[i + j * d] > d) c += 1;
+                        //
                         if (j >= b[d] && head[i + (j - b[d]) * d] > d) c -= 1; 
+                        //
                         if (c > 0) {
                             head[i + (j + 1) * d] = std::max(head[i + (j + 1) * d], d);
                             create_edge(i + j * d, i + (j + 1) * d);
@@ -55,6 +57,7 @@ struct Problem {
         for (int i=W-1; i >= min_w; --i) {
             if (used_unit_edge[i]) continue;
             create_edge(i, i+1);
+            //considerar agregar (i, W)
         }
     }
 

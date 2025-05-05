@@ -1,0 +1,166 @@
+Dec 6 2022 - 1.08p4
+  - Support for a cmake project (CMakeFiles.txt {SiPS,SiPSi}/CMakeFiles.txt).
+  - docs/sample.dat is renamed to docs/sample-sips.dat.
+  - docs/sample-sipsi.dat is added.
+
+Apr  1 2016
+  - Change the function names _(e)dynasearch_int() to
+    _(e)dynasearch_internal() for readability.
+    (SiPS/dynasearch.c, SiPSi/dynasearch.c)
+  - Remove a redundant if in _stage3_loop() when LB_DEBUG is defined.
+    (common/ssdp)
+	
+Mar 30 2016
+  - Change eflag in _lag2_add_modifiers_LR2m_* and _lag2_solve_LR2m_*
+    from char to unsigned char for consistency.
+    (common/lag2.c)
+	
+Oct 28 2015
+  - Fix a problem in SiPS_set_TWT_jobs() for libSiPSi.  It did not work.
+    (SiPSi/problem.c)
+  - Fix a minor problem in treating a round off error in
+    subgradient_LR1() and subgradient_LR2adj()
+    (common/subgradient.c)
+
+Feb  6 2015 - 1.08p3
+  - New version released.
+
+Jan 12 2015
+  - _minimum_of_function() is rewritten to fix a problem caused
+    by the round off error when COST_REAL is defined
+    (SiPSi/func.c).
+
+Jan  6 2015
+  - Fix a problem caused by the round off error in convert_function()
+    and rconvert_function() when COST_REAL is defined
+    (SiPSi/func.c).
+  - Add a forgotten free_function() in insert_ordered_jobs_greedily()
+    (SiPSi/heuristics.c).
+  - Remove the strict check of idle time insertion from
+    insert_ordered_jobs_greedily() (SiPSi/heuristics.c).
+  - New parameter SIPS_R_FUNCEPS for libSiPSi, the tolerance
+    when handling piecewise linear functions converted from job
+    cost functions (SiPS/sips.h, SiPSi/sipsi.h, SiPSi/default.h,
+    SiPSi/func.c, SiPSi/objective.c, common/define.h, common/param.c).
+  - The reference manual is modified accordingly
+    (doc/manual.tex).
+
+Jan  4 2015
+  - _stage0() is separated from _stage1() (common/ssdp.c).
+  - Calling problem_create_graph() is delayed in SiPS_solve()
+    (common/solve.c).
+  - SiPS_compute_lb() is removed (common/solve.c).
+  - time is initialized in _timer_start() (common/timer.c).
+  - New parameter SIPS_I_UBONLY for computing an upper bound only
+    (SiPS/sips.h, SiPSi/sipsi.h, common/param.c, */default.h).
+
+Dec 25 2014
+  - New function SiPS_create_problem_with_name() is introduced
+    (SiPS/sips.h, SiPSi/sipsi.h, common/prob_common.c).
+  - New function SiPS_set_cost_function_long() is introduced
+    (SiPS/sips.h, SiPSi/sipsi.h, common/prob_common.c, */problem.c,
+     */objective.c).
+  - The reference manual is modified accordingly
+    (doc/manual.tex).
+  - Merry Christmas!
+
+Sep 22 2014
+  - SiPS_TWET_set_jobs section in the reference manual is fixed
+    (doc/manual.tex).
+
+Nov 18 2013
+  (Thanks to Nguyen)
+  - SiPS_I_SEARCHTYPE section in the reference manual is fixed
+    (doc/manual.tex).
+  - Dirty output (forgotten "\n") when SIPS_I_VERBOSE=1 is fixed
+    (common/subgradient.c).
+
+Jun 27 2013 - 1.08p2
+  - Default parameters are re-optimized (*/default.h).
+  - The reference manual is updated accordingly (doc/manual.tex).
+
+Jun  7 2013
+  - New parameters SIPS_R_INITTERMITER1 and SIPS_R_INITTERMITER2
+    are introduced for Stage 1 and Stage 2
+    (SiPS/sips.h, SiPSi/sipsi.h, */default.h, common/main.c,
+    common/subgradient.c, common/param.c).
+  - The reference manual is updated accordingly (doc/manual.tex).
+
+Jun  6 2013
+  - DEFAULT_LK1 and DEFAULT_LK2 are changed to DEFAULT_INITSTEP1,
+    DEFAULT_INITSTEP2, respectively (*/default.h).
+  - param.lk1 and param.lk2 are changed to param.initstep1 and
+    param.initstep2, respectively (SiPS/sips.h, SiPSi/sipsi.h,
+    common/param.c, common/subgradient.c).
+  - Options "-lk1" and "-lk2" in the frontend program are changed
+    to "-is1" and "-is2", respectively.  For downward compatibility,
+    "-lk1" and "-lk2" are not removed  (common/main.c).
+  - New parameters param.maxstep1 and param.maxstep2 are introduced
+    to specify the maximum step size in Stages 1 and 2, respectively
+    (SiPS/sips.h, SiPSi/sipsi,h, common/param.c, common/subgradient.c,
+    common/main.c).
+  - The reference manual is updated accordingly (doc/manual.tex).
+
+May 30 2013 - 1.08p1
+  - A bug in _lag2_add_modifiers_LR2m_*() is fixed.
+    When the maximum number of modifiers (SIPS_MAX_MODIFIERS) is set to 8,
+    Stage 3 did not work correctly due to an overflow in mtable.
+    To avoid it, mtable is changed from (char *) to (unsigned char *)
+    (common/lag2.c).
+  - _timer_start() is called before problem_create_graph()
+    in SiPS_solve() and SiPS_compute_lb() (common/solve.c).
+    It will not affect the computation time at all.
+  - "length" is changed from int to size_t in SiPS_TWT_set_job(),
+    SiPS_TWT_set_jobs(), SiPS_TWET_set_job(), and SiPS_TWET_set_jobs()
+    (*/problem.c).
+  - Cast "(int)" is added to the return value of _n_per_block()
+    to suppress warnings when built by MS Visual Studio (common/bmemory.c).
+  - Use fopen_s()/sscanf_s() instead of fopen()/sscanf() when built by MS
+    Visual Studio (*/problem.c).
+  - Use memcpy() instead of strncpy() (*/problem.c).
+  - Use snprintf_s() when built by MS Visual Studio (SiPSi/problem.c).
+  - Remove snprintf() (SiPS/problem.c).
+  - The maximum length of a job name is restricted to MAXNAMELEN
+    in SiPS_set_job_name() and SiPS_set_job_names()
+    as in SiPS_TWT_set_job() (common/prob_common.c).
+  - The year in Copyright is updated from 2012 to 2013 
+    (all the source files, LICENSE).
+  - The reference manual is improved (docs/manual.*).
+  - README is updated.
+Mar 30 2012 - 1.08
+  (Many thanks to Halil Sen)
+  - A bug in _lag_solve_LR1_forward_with_domain() is fixed.
+    prec_set_sd_t() should be inside the loop (common/lag.c).
+  - obj_lesser_equal(), obj_greater_equal() and obj_equal() are
+    modified so that they work correctly for large real objective
+    values (common/define.h).
+  - Inequalities including lbeps are modified so that only lbeps
+    exists in the right-hand side (common/lag.c common/lag2.c
+    common/ssdp.c common/subgradient.c).
+  - LARGE_REAL and LARGE_REAL2 are increased (common/define.h).
+Mar 17 2012
+  - lbeps is changed from (-eps) to (eps) when COST_REAL is defined
+    (common/param.c, common/prob_common.c).
+Mar 16 2012 - 1.07p3
+  - The default objective function type is changed from SIPS_COST_INTEGER
+    to SIPS_COST_REAL (common/param.c).  This is valid only when COST_REAL
+    is defined.  
+Mar 15 2012
+  - The option "-dlv" is removed from the front-end programs
+    (common/main.c).
+  - The reference manual is updated (docs/manual.*).
+  - A typo is fixed (docs/sample.c).
+Feb 26 2012
+  - Two new functions SiPS_get_job() and SiPS_get_jobs()
+    (*/problem.c SiPS/sips.h SiPSi/sipsi.h).
+  - The reference manual is updated (docs/manual.*).
+Feb  6 2012 - 1.07p2
+  - mtable[] memory overrun is fixed in _lag2_add_modifiers_LR2m_*()
+    (common/lag2.c).
+Jan 28 2012
+  - _n_per_block() and create_benv() (common/bmemory.[ch]):
+    The type of the arguments is changed from "int" to "size_t".
+Jan 25 2012 - 1.07p1
+  - Fixed a bug for SiPSi in solution_set_c() (common/sol.c).
+Jan  3 2012 - 1.07
+  - Initial official release.

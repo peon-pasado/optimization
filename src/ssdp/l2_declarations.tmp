@@ -1,0 +1,17 @@
+// Declaraciones de funciones L2
+void update(int id, Node* no, int i, double v);
+void make_and_solve_graph_L2(const vector<double>& mu);
+void L2_fordward(const vector<double>& mu);
+void L2_backward(const vector<double>& mu);
+vector<int> compute_L2_solution_fordward();
+vector<int> compute_L2_solution_backward();
+void elimine_states_L2L2(const vector<double>& mu);
+tuple<vector<double>, double> subgradient_L2(vector<double>& mu, double g_0=1.2, int d_T=n, int d_S=2, double eps=0.001, double k_S=0.95, double k_E=1.3);
+
+void four_sucessive_dominance();
+void dfs_back(Node* it, int pos, int t, bool& dom, bool& n4, int k);
+bool check_dominance(int s[], int t, int k);
+int se[100];
+int opt_cost;
+int eval(int s[], const vector<int> id, int t);
+bool permute(int mask, int last, int time, int cost, int k, int vlast = 0);

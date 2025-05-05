@@ -1,0 +1,2280 @@
+//#pragma GCC optimize("Ofast")
+//#pragma GCC target("avx2")
+//#pragma GCC optimize("unroll-loops")
+#include <bits/stdc++.h>
+//#define double float
+using namespace std;
+
+// Variable global para controlar el nivel de verbosidad
+// 0: Sin output (silencioso)
+// 1: Solo el resultado final (valor óptimo)
+// 2: Resultado final + solución óptima
+// 3: Añade información sobre los stages del algoritmo
+// 4: Añade información detallada de cada iteración y mejoras
+int verbose_level = 3; // Nivel por defecto
+
+// Funciones para imprimir según el nivel de verbosidad
+void print_verbose(int min_level, const string& message) {
+    if (verbose_level >= min_level) {
+        cout << message;
+    }
+}
+
+void println_verbose(int min_level, const string& message) {
+    if (verbose_level >= min_level) {
+        cout << message << endl;
+    }
+}
+
+const int maxN = 252;
+const int maxT = 22005;
+const double EPS = 1e-9;
+int n;
+int w[maxN], ha[maxN];
+int p[maxN], d[maxN];
+using ll = long long;
+ll UB;
+vector<int> UB_sol;
+int nids = 0;
+int pt[310];
+int T;
+vector<double> gmu;
+ll n_edges = 0;
+
+const int B = 64;
+using uint = unsigned long long;
+
+struct bset {
+    vector<uint> s;
+
+    inline int size() const {
+        return s.size();
+    }
+
+    inline void resize(uint n) {
+        s.resize((n + B - 1) / B);
+    }
+
+    inline bool empty() const {
+        return s.empty();
+    }
+
+    inline bool at(uint pos) const {
+        return (s[pos / B] >> (pos % B)) & 1;
+    }
+
+    inline void set(uint pos) {
+        s[pos / B] |= 1ull << (pos % B);
+    }
+
+    inline void unset(uint pos) {
+        s[pos / B] &= ~(1ull << (pos % B));
+    }
+
+    int next(uint pos) const {
+        if (s.empty()) return -1;
+        uint x = pos / B, y = pos % B;
+        if (x >= s.size()) return -1;
+
+        uint mask = s[x] >> y;
+        if (mask) return (x * B) + y + __builtin_ctzll(mask);
+
+        for (++x; x < s.size(); ++x) {
+            if (s[x]) return (x * B) + __builtin_ctzll(s[x]);
+        }
+
+        return -1;
+    }
+};
+
+
+struct Node {
+    int i;
+    Node() {}
+    Node(int i): i(i) {
+        for (int i=0; i<2; ++i) {
+            for (int j=0; j<2; ++j) {
+                value[i][j] = 1e12;
+                no[i][j] = -1;
+            }
+        }
+        indeg=0; 
+        outdeg=0; 
+    }
+    double value[2][2];
+    int no[2][2];
+    //int plen[2][2];
+
+    int indeg;
+    int outdeg;
+    
+    bset adj;
+};
+
+void add_edge(Node* x, Node* y, int pos) {
+    n_edges++;
+    x->outdeg++;
+    y->indeg++;
+    x->adj.set(pos);
+}
+
+void erase_edge(Node* x, Node* y, int pos) {
+    n_edges--;
+    x->outdeg--;
+    y->indeg--;
+    x->adj.unset(pos);
+}
+
+vector<Node*> at[maxT];
+Node* root;
+Node* broot;
+vector<int> ids;
+int od[maxN];
+double h1[maxN][maxT];
+double H1[maxN][maxT];
+
+int f(int i, int T) {
+    return (i >= 1 && i <= n && T > d[i]) ? w[i] * (T - d[i]) : 0;
+}
+
+int calc_cost(const vector<int>& sol) {
+    return UB;
+    int t = 0;
+    int res = 0;
+    for (int i : sol) {
+        t += p[i];
+        res += f(i, t);
+    }
+    return res;
+}
+
+
+void print_ub() {
+    cout << calc_cost(UB_sol) << endl;
+    for (int i : UB_sol) {
+        //cout << i << ' ';
+    }
+    //cout << endl;
+}
+ 
+/** 
+vector<int> greedy_fordward() {
+    set<int> next_elements;
+    for (int i=1; i<=n; ++i) {
+        next_elements.insert(i);
+    }
+    vector<int> sol;
+    int t = 0;
+    for (int i=0; i<n; ++i) {
+        int idx = -1;
+        for (int j : next_elements) {
+            if (idx == -1 || make_pair(f(idx, t + p[idx]), od[idx]) > make_pair(f(j, t + p[j]), od[j])) {
+                idx = j;
+            }
+        }
+        sol.push_back(idx);
+        t += p[idx];
+        next_elements.erase(idx);
+    }
+    return sol;
+}
+**/
+
+std::vector<int> greedy_fordward2() {
+    std::vector<bool> taked(n + 1);
+    std::vector<int> sol(n);
+    int t = 0;
+    for (int i=0; i<n; ++i) {
+        int idx = -1;
+        for (int j=1; j<=n; ++j) {
+            if (taked[j]) continue;
+            if (idx == -1) {
+                idx = j;
+            } else {
+                int64_t f1 = f(j, t + p[j]);// * p[idx];
+                int64_t f2 = f(idx, t + p[idx]);// * p[j];
+                if (std::make_pair(f1, od[j]) < std::make_pair(f2, od[idx])) {
+                    idx = j;
+                }
+            }
+        }
+        taked[idx] = 1;
+        t += p[idx];
+        sol[i] = idx;
+    }
+    return sol;
+}
+
+std::vector<int> greedy_fordward() {
+    vector<int> sol(n);
+    iota(sol.begin(), sol.end(), 1);
+    sort(sol.begin(), sol.end(), [&](int i, int j) {
+        return od[i] < od[j];
+    });
+    vector<int> res = sol;
+    int f = calc_cost(res);
+    for (int i=0; i<n; ++i) {
+        for (int j=i; j+1<n; ++j) {
+        //for (int j=i-1; j>=0; --j) {
+            swap(sol[j+1], sol[j]);
+            int _f = calc_cost(sol);
+            if (_f < f) {
+                res = sol;
+            }
+        }
+        sol = res;
+    }
+    return res;
+}
+
+/** 
+vector<int> greedy_backward() {
+    set<int> next_elements;
+    for (int i=1; i<=n; ++i) {
+        next_elements.insert(i);
+    }
+    vector<int> sol;
+    int T = accumulate(p + 1, p + n + 1, 0);    
+    for (int i=0; i<n; ++i) {
+        int idx=-1;
+        for (int j : next_elements) {
+            if (idx == -1 || f(idx, T) > f(j, T)) {
+                idx = j;
+            }
+        }
+        sol.push_back(idx);
+        T -= p[idx];
+        next_elements.erase(idx);
+    }
+    reverse(sol.begin(), sol.end());
+    return sol;
+}
+**/
+
+std::vector<int> greedy_backward2() {
+    std::vector<bool> taked(n + 1);
+    std::vector<int> sol(n);
+    int t = T;
+    for (int i=n-1; i>=0; --i) {
+        int idx = -1;
+        for (int j=1; j<=n; ++j) {
+            if (taked[j]) continue;
+            if (idx == -1) {
+                idx = j;
+            } else {
+                int64_t f1 = f(j, t);// * p[idx];
+                int64_t f2 = f(idx, t);// * p[j];
+                if (std::make_pair(f1, od[j]) < std::make_pair(f2, od[idx])) {
+                    idx = j;
+                }
+            }
+        }
+        taked[idx] = 1;
+        t -= p[idx];
+        sol[i] = idx;
+    }
+    return sol;
+}
+ 
+std::vector<int> greedy_backward() {
+    vector<int> sol(n);
+    iota(sol.begin(), sol.end(), 1);
+    sort(sol.begin(), sol.end(), [&](int i, int j) {
+        return od[i] < od[j];
+    });
+    vector<int> res = sol;
+    int f = calc_cost(res);
+    for (int i=n-1; i>=0; --i) {
+        for (int j=i-1; j>=0; --j) {
+        //for (int j=i; j+1<n; ++j) {
+            swap(sol[j+1], sol[j]);
+            int _f = calc_cost(sol);
+            if (_f < f) {
+                res = sol;
+            }
+        }
+        sol = res;
+    }
+    return res;
+}
+
+vector<int> shortest_processing_time_order() {
+    vector<int> id(n);
+    iota(id.begin(), id.end(), 1);
+    sort(id.begin(), id.end(), [](int i, int j) {
+        return od[i] < od[j];
+    });
+    return id;   
+}
+
+/** 
+vector<int> dynasearch(vector<int> order, int lw = 0, int nit = 10000) {
+    int n = order.size();
+    vector<int> c(n);                       // Vector de acumulados
+    vector<vector<int>> dp(n + 1, vector<int>(3)); // dp[i]: [costo, índice previo, tipo de movimiento]
+    vector<int> job(n);
+    
+    for (int s = 0; s < nit; ++s) {
+        // Construcción de c: costo acumulado de p para cada posición
+        c[0] = p[order[0]];
+        for (int i = 1; i < n; ++i)
+            c[i] = c[i - 1] + p[order[i]];
+        
+        // Si ya se han fijado algunos elementos (lw > 0), se calcula su costo
+        if (lw > 0) {
+            int prefixCost = 0;
+            // El costo para el primer elemento es f(order[0], c[0]) y para los siguientes se acumula
+            for (int i = 0; i < lw; i++) {
+                prefixCost += f(order[i], c[i]);
+            }
+            dp[lw][0] = prefixCost;
+            dp[lw][1] = lw - 1;
+            dp[lw][2] = 0;
+        } else {
+            dp[0][0] = 0;
+            dp[0][1] = -1;
+            dp[0][2] = 0;
+        }
+        
+        // Se calcula el DP solo a partir de lw+1 (dejando fija la parte [0, lw-1])
+        for (int i = lw + 1; i <= n; i++) {
+            dp[i][0] = dp[i - 1][0] + f(order[i - 1], c[i - 1]);
+            dp[i][1] = i - 1;
+            dp[i][2] = 0;
+            
+            // Operador PI: prueba intercambiar el elemento en la posición i-1 con alguno anterior
+            for (int j = lw; j <= i - 2; j++) {
+                int cx = (j > 0) ? c[j - 1] + p[order[i - 1]] : p[order[i - 1]];
+                int vv = dp[j][0] + f(order[i - 1], cx);
+                for (int k = j + 1; k <= i - 2; k++) {
+                    cx += p[order[k]];
+                    vv += f(order[k], cx);
+                }
+                cx += p[order[j]];
+                vv += f(order[j], cx);
+                if (vv < dp[i][0]) {
+                    dp[i][0] = vv;
+                    dp[i][1] = j;
+                    dp[i][2] = 1;
+                }
+            }
+            
+            // Operador EBSR
+            for (int j = lw; j <= i - 3; j++) {
+                int cx = (j > 0) ? c[j - 1] + p[order[i - 1]] : p[order[i - 1]];
+                int vv = dp[j][0] + f(order[i - 1], cx);
+                for (int k = j; k <= i - 2; k++) {
+                    cx += p[order[k]];
+                    vv += f(order[k], cx);
+                }
+                if (vv < dp[i][0]) {
+                    dp[i][0] = vv;
+                    dp[i][1] = j;
+                    dp[i][2] = 2;
+                }
+            }
+            
+            // Operador EFSR
+            for (int j = lw; j <= i - 3; j++) {
+                int cx = (j > 0) ? c[j - 1] : 0;
+                int vv = dp[j][0];
+                for (int k = j + 1; k <= i - 1; k++) {
+                    cx += p[order[k]];
+                    vv += f(order[k], cx);
+                }
+                cx += p[order[j]];
+                vv += f(order[j], cx);
+                if (vv < dp[i][0]) {
+                    dp[i][0] = vv;
+                    dp[i][1] = j;
+                    dp[i][2] = 3;
+                }
+            }
+        }
+        
+        // Reconstrucción de la solución a partir del DP
+        for (int i = n, j = n - 1; i > 0;) {
+            switch (dp[i][2]) {
+                case 0:
+                    job[j--] = order[dp[i][1]];
+                    break;
+                case 1: // PI
+                    job[j--] = order[dp[i][1]];
+                    for (int k = i - 2; j > dp[i][1]; j--, k--)
+                        job[j] = order[k];
+                    job[j--] = order[i - 1];
+                    break;
+                case 2: // EBSR
+                    for (int k = i - 2; j > dp[i][1]; j--, k--)
+                        job[j] = order[k];
+                    job[j--] = order[i - 1];
+                    break;
+                case 3: // EFSR
+                    job[j--] = order[dp[i][1]];
+                    for (int k = i - 1; j >= dp[i][1]; j--, k--)
+                        job[j] = order[k];
+                    break;
+            }
+            i = dp[i][1];
+        }
+        
+        // Se determina cuántos elementos iniciales permanecen iguales
+        int fixed = 0;
+        while (fixed < n && order[fixed] == job[fixed])
+            fixed++;
+        
+        // Si la solución completa no cambia, terminamos
+        if (fixed == n)
+            break;
+        
+        // Actualizamos lw: la nueva parte fija será [0, fixed-1]
+        lw = 0; //fixed;
+        
+        // Actualizamos el orden: la parte fija permanece y la parte [fixed, n-1] es la reoptimizada
+        order.swap(job);
+    }
+    
+    return order;
+}
+**/
+
+
+vector<int> dynasearch(vector<int> order, int lw = 0, int nit = 2000) {
+    int n = order.size();
+    vector<int> c(n);
+    vector<vector<int>> dp(n + 1, vector<int>(3));
+    vector<int> job(n);
+
+    for (int s = 0; s < nit; ++s) {
+        c[0] = p[order[0]];
+        for (int i = 1; i < n; ++i)
+            c[i] = c[i - 1] + p[order[i]];
+
+        dp[0][0] = 0;
+        dp[0][1] = -1;
+        dp[0][2] = 0;
+
+        for (int i = lw + 1; i <= n; i++) {
+            dp[i][0] = dp[i - 1][0] + f(order[i - 1], c[i - 1]);
+            dp[i][1] = i - 1;
+            dp[i][2] = 0;
+
+            // Regla PI
+            for (int j = 0; j <= i - 2; j++) {
+                int cx = (j > 0) ? c[j - 1] + p[order[i - 1]] : p[order[i - 1]];
+                int vv = dp[j][0] + f(order[i - 1], cx);
+                for (int k = j + 1; k <= i - 2; k++) {
+                    cx += p[order[k]];
+                    vv += f(order[k], cx);
+                }
+                cx += p[order[j]];
+                vv += f(order[j], cx);
+                if (vv < dp[i][0]) {
+                    dp[i][0] = vv;
+                    dp[i][1] = j;
+                    dp[i][2] = 1;
+                }
+            }
+
+            // Regla EBSR
+            for (int j = 0; j <= i - 3; j++) {
+                int cx = (j > 0) ? c[j - 1] + p[order[i - 1]] : p[order[i - 1]];
+                int vv = dp[j][0] + f(order[i - 1], cx);
+                for (int k = j; k <= i - 2; k++) {
+                    cx += p[order[k]];
+                    vv += f(order[k], cx);
+                }
+                if (vv < dp[i][0]) {
+                    dp[i][0] = vv;
+                    dp[i][1] = j;
+                    dp[i][2] = 2;
+                }
+            }
+
+            // Regla EFSR
+            for (int j = 0; j <= i - 3; j++) {
+                int cx = (j > 0) ? c[j - 1] : 0;
+                int vv = dp[j][0];
+                for (int k = j + 1; k <= i - 1; k++) {
+                    cx += p[order[k]];
+                    vv += f(order[k], cx);
+                }
+                cx += p[order[j]];
+                vv += f(order[j], cx);
+                if (vv < dp[i][0]) {
+                    dp[i][0] = vv;
+                    dp[i][1] = j;
+                    dp[i][2] = 3;
+                }
+            }
+
+            // Regla RS (Reverse Segment)
+            if (s <= 3) {
+                for (int j = 0; j <= i - 2; j++) {
+                    int cx = (j > 0) ? c[j - 1] : 0;
+                    int vv = dp[j][0];
+                    for (int k = i - 1; k >= j; k--) {
+                        cx += p[order[k]];
+                        vv += f(order[k], cx);
+                    }
+                    if (vv < dp[i][0]) {
+                        dp[i][0] = vv;
+                        dp[i][1] = j;
+                        dp[i][2] = 4;
+                    }
+                }
+            }
+        }
+
+
+        // Reconstrucción de la solución
+        for (int i = n, j = n - 1; i > 0;) {
+            switch (dp[i][2]) {
+                case 0:
+                    job[j--] = order[dp[i][1]];
+                    break;
+                case 1: {
+                    job[j--] = order[dp[i][1]];
+                    for (int k = i - 2; j > dp[i][1]; j--, k--)
+                        job[j] = order[k];
+                    job[j--] = order[i - 1];
+                    break;
+                }
+                case 2: {
+                    for (int k = i - 2; j > dp[i][1]; j--, k--)
+                        job[j] = order[k];
+                    job[j--] = order[i - 1];
+                    break;
+                }
+                case 3: {
+                    job[j--] = order[dp[i][1]];
+                    for (int k = i - 1; j >= dp[i][1]; j--, k--)
+                        job[j] = order[k];
+                    break;
+                }
+                case 4: {
+                    for (int k = dp[i][1]; k < i; k++)
+                        job[j--] = order[k];
+                    break;
+                }
+            }
+            i = dp[i][1];
+        }
+
+        if (job == order)
+            break;
+        order.swap(job);
+    }
+    return order;
+}
+
+
+
+vector<int> greedy_sp() {
+    vector<int> s;
+    int t = T;
+    vector<bool> vis(n + 1); 
+    for (int i=0; i<n; ++i) {
+        int idx = -1;
+        for (int i=1; i<=n; ++i) {
+            if (vis[i]) continue;
+            if (idx == -1 || h1[i][t] < h1[idx][t]) {
+                idx = i;
+            }       
+        }
+        s.push_back(idx);
+        vis[idx] = 1;
+        t -= p[idx];
+    }
+    return s;
+}
+
+mt19937 rng(chrono::steady_clock::now().time_since_epoch().count());
+vector<int> greedy_sp_l2() {
+    vector<int> s;
+    int v = -1;
+    int t = T;
+    vector<bool> vis(n + 1);
+    vector<int> id(n);
+    iota(id.begin(), id.end(), 1);
+    shuffle(id.begin(), id.end(), rng);
+    for (int i=1; i<=n; ++i) {
+        double val = 1e13;
+        for (auto jt : at[t]) {
+            if (jt->no[0][0] == -1) continue;
+            if (vis[jt->i]) continue;
+            if (jt->value[0][0] < val) {
+                val = jt->value[0][0];
+                v = jt->i;
+            }
+        }        
+        if (val > 1e12) {
+            vector<int> r;
+            for (int i=1; i<=n; ++i) {
+                if (vis[i]) continue;
+                r.push_back(i);
+                break;
+            }
+            v = r[0];
+        }
+        vis[v] = 1;
+        s.push_back(v);
+        t -= p[v];
+    }
+    reverse(s.begin(), s.end());
+    return s;
+}
+
+vector<int> greedy_sp_l2_backward() {
+    vector<int> s;
+    int v = -1;
+    int t = 0;
+    vector<bool> vis(n + 1);
+    vector<int> id(n);
+    iota(id.begin(), id.end(), 1);
+    shuffle(id.begin(), id.end(), rng);
+    for (int i = 1; i <= n; ++i)
+    {
+        double val = 1e12;
+        for (auto jt : at[t])
+        {
+            for (int k=0; k<2; ++k) {
+                if (jt->no[1][k] == -1)
+                    continue;
+                if (vis[jt->no[1][k]])
+                    continue;
+                if (jt->value[1][k] < val)
+                {
+                    val = jt->value[1][k];
+                    v = jt->no[1][k];
+                }
+            }
+        }
+        if (val > 1e8 || v == n+1) {
+            for (int i = 1; i <= n; ++i) {
+               if (vis[i])
+                    continue;
+                v = i;
+                break;
+            }
+        }
+        vis[v] = 1;
+        s.emplace_back(v);
+        t += p[v];
+    }
+    //reverse(s.begin(), s.end());
+    return s;
+}
+
+vector<int> upper_bound_refine(vector<int>& quasi_solution, int lim=12, bool ford=1, bool L2 = 1) { //FORDWARD
+    //elements 1, 2, ..., n
+    vector<int> order_; //order from left
+    vector<int> cnt(n); //count contribution
+    if (!ford) {
+        reverse(quasi_solution.begin(), quasi_solution.end());
+    }
+    for (auto s_i : quasi_solution) {
+        if (cnt[s_i - 1] == 0) {
+            order_.push_back(s_i - 1); 
+        }
+        cnt[s_i - 1] += 1;
+    }
+    if (!ford) {
+        reverse(order_.begin(), order_.end());
+        reverse(quasi_solution.begin(), quasi_solution.end());
+    }
+
+    //0-base from here
+    int N1 = order_.size();
+    int N2 = n - N1;
+
+    if (N2 == 0) {
+        //cout << "n2 found solution " << ford << endl;
+        UB_sol = quasi_solution;
+        print_ub();
+        exit(0);
+    }
+
+    if (N2 <= lim) { // proceso de programación dinámica
+        // Copia de los elementos fijos y construcción del vector free_item para los elementos sin contar (cnt[i] == 0)
+        vector<int> fixed_item = order_;
+        vector<int> free_item;
+        for (int i = 0; i < n; ++i) {
+            if (cnt[i] == 0) {
+                free_item.push_back(i);
+            }
+        }
+        
+        // Precalcular sum_subset: suma de p para cada subconjunto de free_item.
+        int freeCount = N2;
+        int subsetSize = 1 << freeCount;
+        vector<int> sum_subset(subsetSize, 0);
+        // sum_subset[0] ya es 0; para cada subconjunto s, se obtiene el índice del bit menos significativo activo
+        for (int s = 1; s < subsetSize; ++s) {
+            int bit = __builtin_ctz(s); // índice del primer bit activo
+            sum_subset[s] = sum_subset[s ^ (1 << bit)] + p[free_item[bit]];
+        }
+        
+        // Precalcular sum_prefix: suma acumulada de p para los elementos fijos.
+        vector<int> sum_prefix(N1 + 1, 0);
+        for (int i = 1; i <= N1; ++i) {
+            sum_prefix[i] = sum_prefix[i - 1] + p[fixed_item[i - 1]];
+        }
+        
+        // Inicializar DP y vector de reconstrucción.
+        const long long INF = 1e18;
+        // dp[i][s]: costo mínimo usando i elementos fijos y el subconjunto s (de free_item).
+        vector<vector<long long>> dp(N1 + 1, vector<long long>(subsetSize, INF));
+        vector<vector<int>> tr(N1 + 1, vector<int>(subsetSize, -1));
+        dp[0][0] = 0;
+        
+        // Caso base: solo fijos, s == 0.
+        for (int i = 1; i <= N1; ++i) {
+            int T = sum_prefix[i];
+            long long candidate = dp[i - 1][0] + f(fixed_item[i - 1], T);
+            if (candidate < dp[i][0]) {
+                dp[i][0] = candidate;
+                tr[i][0] = -i;  // usamos -i para indicar que se tomó fixed_item[i-1]
+            }
+        }
+        
+        // Caso base: usar solo free_item (fijos = 0).
+        for (int s = 1; s < subsetSize; ++s) {
+            int T = sum_subset[s];
+            int bit = __builtin_ctz(s);
+            long long candidate = dp[0][s ^ (1 << bit)] + f(free_item[bit], T);
+            if (candidate < dp[0][s]) {
+                dp[0][s] = candidate;
+                tr[0][s] = bit;
+            }
+        }
+        
+        // Rellenar DP combinando elementos fijos y libres.
+        for (int i = 1; i <= N1; ++i) {
+            for (int s = 1; s < subsetSize; ++s) {
+                int T = sum_prefix[i] + sum_subset[s];
+                // Opción 1: agregar siguiente fixed_item.
+                long long candidate = dp[i - 1][s] + f(fixed_item[i - 1], T);
+                if (candidate < dp[i][s]) {
+                    dp[i][s] = candidate;
+                    tr[i][s] = -i;
+                }
+                // Opción 2: agregar algún free_item (para cada bit activo en s).
+                for (int j = 0; j < freeCount; ++j) {
+                    if (s & (1 << j)) {
+                        candidate = dp[i][s ^ (1 << j)] + f(free_item[j], T);
+                        if (candidate < dp[i][s]) {
+                            dp[i][s] = candidate;
+                            tr[i][s] = j;
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Reconstrucción de la solución.
+        int i = N1, s = subsetSize - 1;
+        vector<int> ub_solution;
+        while (i != 0 || s != 0) {
+            int r = tr[i][s];
+            if (r < 0) {
+                // Se usó un elemento fijo.
+                ub_solution.push_back(fixed_item[-r - 1] + 1);
+                i--;
+            } else {
+                // Se usó un free_item.
+                ub_solution.push_back(free_item[r] + 1);
+                s ^= (1 << r);
+            }
+        }
+        
+        return ub_solution;
+    }
+    
+    vector<int> sol = L2 ? (ford ? greedy_sp_l2() : greedy_sp_l2_backward()) : greedy_sp();
+    return sol;
+}
+
+void L1_fordward(const vector<double>& mu) { 
+
+    for (int i=0; i<=n+1; ++i)
+        for (int t=0; t<=T+2; ++t) {
+            h1[i][t] = 1e12;
+        }
+    
+    h1[0][0] = 0.;
+    vector<pair<int, int>> best(T + 1, make_pair(-1, -1));
+    best[0] = {0, -1};
+    for (int t=1; t<=T; ++t) {
+        for (int i=1; i<=n; ++i) {
+            if (p[i] > t) continue;
+
+            auto [s, r] = best[t - p[i]];
+
+            if (s == -1) continue;
+
+            if (s != i) {
+                h1[i][t] = h1[s][t - p[i]] + f(i, t) - mu[i];
+            } else if (r != -1) {
+                h1[i][t] = h1[r][t - p[i]] + f(i, t) - mu[i];
+            } else continue;
+
+            auto& [u, v] = best[t];
+
+            if (u == -1 || h1[u][t] >= h1[i][t]) {
+                v = u;
+                u = i;
+            }
+            else if (v == -1 || h1[v][t] > h1[i][t]) {
+                v = i;
+            }
+        }
+    }    
+}
+
+vector<int> obtain_fordward_L1() {
+    int t = T;
+    vector<int> s;
+    int last_idx = -1;
+    while (t > 0) {
+        int idx = -1;
+        for (int i=1; i<=n; ++i) {
+            if (i == last_idx) continue;
+            if (idx == -1 || h1[idx][t] > h1[i][t]) {
+                idx = i;
+            }
+        }
+        last_idx = idx;
+        s.push_back(idx);
+        t -= p[idx];
+    }
+    reverse(s.begin(), s.end());
+    return s;
+}
+
+void L1_backward(const vector<double>& mu) {
+    for (int i=0; i<=n+1; ++i)
+        for (int t=0; t<=T+2; ++t) {
+            H1[i][t] = 1e12;
+        }
+    H1[n+1][T+1] = 0.;
+    vector<pair<int, int>> best(T + 2, {-1, -1});
+    best[T] = {n+1, -1};
+    for (int t=T; t>=0; --t) {
+        for (int i=1; i<=n; ++i) {
+            if (p[i] > t) continue;
+            auto [s, r] = best[t];
+            if (s == -1) continue;
+            if (s != i) {
+                H1[i][t] = H1[s][t + p[s]] + f(i, t) - mu[i];
+            } else if (r == -1) {
+                continue;
+            } else {
+                H1[i][t] = H1[r][t + p[r]] + f(i, t) - mu[i];
+            }
+            auto& [u, v] = best[t - p[i]];
+            if (u == -1) {
+                u = i;
+            }
+            else if (H1[u][t - p[i] + p[u]] >= H1[i][t]) {
+                v = u;
+                u = i;
+            } 
+            else if (v == -1 || H1[v][t - p[i] + p[v]] > H1[i][t]) {
+                v = i;
+            }
+        }
+    } 
+
+    H1[0][0] = H1[best[0].first][p[best[0].first]]; 
+}
+
+vector<int> obtain_backward_L1() {
+    vector<int> sol;
+    int t=0;
+    int last_idx = -1;
+    while (t != T) {
+        int idx = -1;
+        for (int i=1; i<=n; ++i) {
+            if (t + p[i] > T) continue;
+            if (i == last_idx) continue;
+            if (idx == -1 || H1[idx][t + p[idx]] > H1[i][t + p[i]]) {
+                idx = i;
+            }
+        }
+        last_idx = idx;
+        sol.push_back(idx);
+        t += p[idx];
+    }
+    return sol;    
+}
+
+double calc_cost_lb(const vector<int>& s, const vector<double>& mu) {
+    double sum = 0;
+    int t = 0;
+    for (auto i : s) {
+        t += p[i];
+        sum += f(i, t) - mu[i];
+    }
+    for (int i=1; i<=n; ++i) {
+        sum += mu[i];
+    }
+    return sum; 
+}
+
+
+double dnorm = 1;
+vector<double> du(300);
+void update_multipliers(vector<double>& mu, double LB, double UB, const vector<int32_t>& dual_solution, double g) {
+    vector<int> cnt_elem(n + 1);
+    for (int i : dual_solution) {
+        cnt_elem[i]++;
+    }
+    double norm = 0;
+    for (int i=1; i <= n; ++i) {
+        norm += (1 - cnt_elem[i]) * (1 - cnt_elem[i]); 
+    }
+    if (norm < 0.5) {
+        UB_sol = dual_solution;
+        print_ub();
+        exit(0);
+    }
+
+    double ksi = sqrt(norm / dnorm);
+
+    for (int i = 1; i <= n; ++i) {
+        du[i] = (1 - cnt_elem[i]) + ksi * du[i];
+    }
+
+    dnorm = 0.0;
+    for(int i = 1; i <= n; i++) {
+        dnorm += du[i] * du[i];
+    }
+
+    if(dnorm < 0.02) {
+        dnorm = norm;
+        for(int32_t i = 1; i <= n; ++i) {
+            du[i] = (1 - cnt_elem[i]);
+        }
+    }
+
+    double tk = g * (UB - LB) / dnorm;
+    for (int i=1; i <= n; ++i) {
+        mu[i] += tk * du[i];
+    }
+
+    //gmu = mu;
+}
+
+/** 
+void update_multipliers(vector<double>& mu, double LB, double UB, const vector<int>& dual_solution, double g) {
+    vector<int> cnt_elem(n + 1);
+    for (int i : dual_solution) {
+        cnt_elem[i]++;
+    }
+    double sqr_from_1 = 0;
+    for (int i=1; i <= n; ++i) {
+        sqr_from_1 += (1 - cnt_elem[i]) * (1 - cnt_elem[i]); 
+    }
+    if (sqr_from_1 < 0.5) {
+        UB_sol = dual_solution;
+        print_ub();
+        exit(0);
+    }
+
+    for (int i=1; i <= n; ++i) {
+        mu[i] += g * (1 - cnt_elem[i]) * (UB - LB) / sqr_from_1;
+    }
+    gmu = mu;
+}
+**/
+
+//gamma_init, delta_T, delta_S, eps, k_S, k_E
+tuple<vector<double>, double> subgradient_L1(double g_0=1, int d_T=n, int d_S=2, double eps=0.02, double k_S=0.97, double k_E=1.25) {
+    auto start = std::chrono::high_resolution_clock::now();    
+    vector<double> mu(n + 2, 0.);
+    auto best_mu = mu;
+    vector<double> G(d_T);
+    double best = 0;
+    double cur = 0;
+    int iter = 0;   
+    int id_best = 0;
+    double g = g_0;
+    int niter = 0;
+    while (true) {
+        niter++;
+        int pre = iter;
+        iter = (iter + 1) % d_T;
+        int last = (iter + 1) % d_T;
+        L1_fordward(mu);
+        auto sol_lb = obtain_fordward_L1();
+        cur = calc_cost_lb(sol_lb, mu);
+
+        G[iter] = max(G[pre], cur);
+        
+        if (niter > d_T 
+            && G[iter] * (1 - eps) < G[last]
+            && (G[iter] - G[pre]) < (UB - G[last]) * eps) {
+            //cout << "kill by eps" << endl;
+            break;
+        } 
+
+        if (cur > best + EPS) {
+            best = cur;
+            best_mu = mu;
+            id_best = niter;
+            if (niter != 1) g *= k_E;              
+        }
+        
+        if (niter - id_best > d_S) {
+            g *= k_S;
+        }
+
+        if (g > g_0) g = g_0;
+        if (g < 1e-4) break;
+        if (UB - cur < 1) break;
+        update_multipliers(mu, cur, UB, sol_lb, g);
+        //cout.precision(4);
+        if (abs(cur - best) < 1e-5) {
+            //cout << "[" << niter << "] ";
+            //cout << fixed;
+            //cout << "LB=" << best << ' ' << "UB=" << UB << ' ' << "lk=" << g << endl; 
+        } 
+    }
+    auto end = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+
+    //cout << "Time: " << duration.count() / 1000000. << " segundos." << endl;
+
+
+    L1_fordward(best_mu);
+    auto sol_lb = obtain_fordward_L1();
+    auto lb = calc_cost_lb(sol_lb, best_mu);
+    return tuple<vector<double>, double>(best_mu, lb);
+}
+ 
+vector<int> new_pos[maxT];
+void shrink(bool bck=1, bool repeat=0) {
+    ////cout << "init shrink" << endl;
+    int m = 0;
+    auto can_erase = [bck](Node* it) {
+        if (it == root || it == broot) return 0;
+        if (it->no[0][0] == -1) return 1;
+        if (bck && it->no[1][0] == -1) return 1;
+        if (it->outdeg == 0 || it->indeg == 0) return 1;
+        return 0;
+    };
+
+    /** 
+    queue<pair<int, int>> Q;
+    for (int i=T+1; i>=0; --i) {
+        for (int j=0; j<(int)at[i].size(); ++j) {
+            if (can_erase(at[i][j])) {
+                Q.push({i, j});
+            }
+        }
+    }
+
+    while (!Q.empty()) {
+        auto [i, j] = Q.front(); Q.pop();
+        auto q = at[i][j];
+        if (q == nullptr) continue;
+        int tk = i - p[q->i];
+        for (int k=q->adj.next(0); ~k; k=q->adj.next(k+1)) {
+            if (at[tk][k] != nullptr) {
+                erase_edge(q, at[tk][k], k);
+                if (can_erase(at[tk][k])) {
+                    Q.push({tk, k});
+                }
+            } else {
+                q->adj.unset(k);
+                q->outdeg--;
+            }
+            m++;
+        }
+        delete at[i][j];
+        at[i][j] = nullptr;
+    }**/
+
+   //double smu = accumulate(gmu.begin(), gmu.end(), 0.d);
+    for (int i=T+1; i>=0; --i) {
+        for (int j=0; j<(int)at[i].size(); ++j) {
+            if (at[i][j] == nullptr) continue;
+            if (can_erase(at[i][j])) {
+                int tk = i - p[at[i][j]->i];
+                for (int k=at[i][j]->adj.next(0); ~k; k=at[i][j]->adj.next(k+1)) {
+                    if (at[tk][k] != nullptr) {
+                        erase_edge(at[i][j], at[tk][k], k);
+                    } else {
+                        n_edges--;
+                        at[i][j]->adj.unset(k);
+                        at[i][j]->outdeg--;
+                    }
+                    m++;
+                }
+                delete at[i][j];
+                at[i][j] = nullptr;
+            }
+        }
+    }
+
+    for (int i=0; i<=T+1; ++i) {
+        for (int j=0; j<(int)at[i].size(); ++j) {
+            if (at[i][j] == nullptr) continue;
+            if (can_erase(at[i][j])) {
+                int tk = i - p[at[i][j]->i];
+                for (int k=at[i][j]->adj.next(0); ~k; k=at[i][j]->adj.next(k+1)) {
+                    if (at[tk][k] != nullptr) {
+                        erase_edge(at[i][j], at[tk][k], k);
+                    } else {
+                        n_edges--;
+                        at[i][j]->adj.unset(k);
+                        at[i][j]->outdeg--;
+                    }
+                    m++;
+                }
+                delete at[i][j];
+                at[i][j] = nullptr;
+            }
+        }
+    }
+
+/** 
+    for (int i=T+1; i>=0; --i) {
+        for (int j=0; j<(int)at[i].size(); ++j) {
+            if (at[i][j] == nullptr) continue;
+            if (can_erase(at[i][j])) {
+                int tk = i - p[at[i][j]->i];
+                for (int k=at[i][j]->adj.next(0); ~k; k=at[i][j]->adj.next(k+1)) {
+                    if (at[tk][k] != nullptr) {
+                        erase_edge(at[i][j], at[tk][k], k);
+                    } else {
+                        at[i][j]->adj.unset(k);
+                        at[i][j]->outdeg--;
+                    }
+                    m++;
+                }
+                delete at[i][j];
+                at[i][j] = nullptr;
+            }
+        }
+    }
+    **/
+
+    for (int i=0; i<=T+1; ++i) {
+        new_pos[i].resize(at[i].size(), -1);
+        int k = 0;
+        for (int j=0; j<(int)at[i].size(); ++j) {
+            if (at[i][j] != nullptr) {
+                new_pos[i][j] = k;
+                if (j != k) swap(at[i][j], at[i][k]);
+                ++k;
+            }
+        }
+        at[i].resize(k);
+        if (i == 0) continue;
+        for (int j=0; j<(int)at[i].size(); ++j) {
+            if (at[i][j] == nullptr) continue;
+            int tk = i - p[at[i][j]->i];
+            for (int k=at[i][j]->adj.next(0); ~k; k=at[i][j]->adj.next(k+1)) {
+                at[i][j]->adj.unset(k);
+                if (new_pos[tk][k] != -1) {
+                    at[i][j]->adj.set(new_pos[tk][k]);
+                } else {
+                    m++;
+                    at[i][j]->outdeg--;
+                    n_edges--;
+                }
+            }
+            at[i][j]->adj.resize(at[tk].size());
+        }
+    }
+
+    for (int i=0; i<=T+1; ++i) {
+        new_pos[i].clear();
+    }
+
+    
+    ////cout << "erased edges: " << m << endl;
+    if (repeat && m > 0) shrink(bck, repeat);
+    //if (m > 0) shrink(bck, repeat);
+}
+
+
+int eval(int s[], const vector<int> id, int t) {
+    int res = 0;
+    for (int i : id) {
+        t += p[s[i]];
+        res += f(s[i], t);
+    }
+    return res;
+}
+
+bool check_two_dominance(int init_t, int i, int j) {
+    if (i == 0) return 1;
+    int dij = f(i, init_t + p[i]) + f(j, init_t + p[i] + p[j]);
+    int dji = f(j, init_t + p[j]) + f(i, init_t + p[i] + p[j]);
+    return dij < dji || (dij == dji && od[i] < od[j]); 
+}
+
+/** 
+int se[10];
+int opt_cost;
+bool permute(int mask, int last, int time, int cost) {
+    if (mask == 15) {
+        return cost < opt_cost;
+    }
+    for (int i=0; i<4; ++i) {
+        if ((~mask & (1<<i)) && check_two_dominance(time - p[se[last]], se[last], se[i])) {
+            if (permute(mask ^ (1<<i), i, time + p[se[i]], cost + f(se[i], time + p[se[i]]))) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+**/
+int se[100];
+int opt_cost;
+bool permute(int mask, int last, int time, int cost, int k, int vlast = 0) {
+    if (cost >= opt_cost) return false;
+    if (mask == (1<<k)-1) {
+        return cost < opt_cost;
+    }
+
+    //j i k x
+    //i k j x
+    //i j k
+    //k i j 
+    //k j i 
+    //j k i 
+    if (last == -1) {
+        for (int i=0; i<k; ++i) {
+            if (permute(mask ^ (1<<i), i, time + p[se[i]], cost + f(se[i], time + p[se[i]]), k, last)) {
+                return true;
+            }
+        }
+    } else if (vlast == -1) {
+        for (int i=0; i<k; ++i) { 
+            if ((~mask & (1<<i)) && check_two_dominance(time - p[se[last]], se[last], se[i])) {
+                if (permute(mask ^ (1<<i), i, time + p[se[i]], cost + f(se[i], time + p[se[i]]), k, last)) {
+                    return true;
+                }
+            }
+        }
+    } else {
+        int base = time - p[se[last]] - p[se[vlast]];
+        for (int i=0; i<k; ++i) {
+            int tcost = f(se[vlast], base + p[se[vlast]]) + f(se[last], time) + f(se[i], time + p[se[i]]);
+            if ((~mask & (1<<i)) && check_two_dominance(time - p[se[last]], se[last], se[i])) {
+                
+                if (check_two_dominance(base + p[se[i]], se[last], se[vlast])) {
+                    int rcost = f(se[i], base + p[se[i]]) + f(se[last], base + p[se[i]] + p[se[last]]) + f(se[vlast], time + p[se[i]]);
+                    if (rcost < tcost) continue;
+                } else {
+                    int rcost = f(se[i], base + p[se[i]]) + f(se[vlast], base + p[se[i]] + p[se[vlast]]) + f(se[last], time + p[se[i]]);
+                    if (rcost < tcost) continue;
+                }
+                int vcost = f(se[last], base + p[se[last]]) + f(se[i], base + p[se[last]] + p[se[i]]) + f(se[vlast], time + p[se[i]]);
+                if (vcost < tcost) continue;
+                
+
+                if (permute(mask ^ (1<<i), i, time + p[se[i]], cost + f(se[i], time + p[se[i]]), k, last)) {
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
+}
+ 
+/** 
+int fr[5];
+bool check_dominance(int s[], int t) {
+    for (int i = 0; i < 4; ++i) fr[i] = s[i];
+    vector<int> id(4);
+    iota(id.begin(), id.end(), 0);
+    int F = eval(fr, id, t);
+    for (int i = 1; i <= 23; ++i) {
+        next_permutation(id.begin(), id.end());
+        int G = eval(fr, id, t);
+        if (F > G) return 0;// || (k == 3 && (F == G && od[fr[k - 3]] > od[fr[id[k - 3]]]))) return 0;
+    }
+    return 1;
+}
+**/
+
+/** 
+bool check_dominance(int s[], int t) {
+    for (int i=0; i<4; ++i) se[i] = s[i];
+    vector<int> id{0, 1, 2, 3};
+    opt_cost = eval(se, id, t);
+    shuffle(se, se+4, rng);
+    return !permute(0, 0, t, 0);
+}
+**/
+
+bool check_dominance(int s[], int t, int k) {
+    for (int i=0; i<k; ++i) se[k-1-i] = s[i];
+    vector<int> id(k);
+    iota(id.begin(), id.end(), 0);
+    opt_cost = eval(se, id, t);
+    //shuffle(se, se+k, rng);
+    return !permute(0, -1, t, 0, k, -1);
+}
+
+
+//87.59
+
+/** 
+bool vis[maxN];
+int seq[10];
+void dfs_back(Node* it, int pos, int t, bool& dom, bool& n4) {
+    if (dom) return;
+    if (pos == -1) {
+        n4 = 1;
+        dom |= check_dominance(seq, t);
+        return;
+    }
+    vis[it->i] = 1;
+    for (int j=it->adj.next(0); ~j; j=it->adj.next(j+1)) {
+        if (dom) break;
+        auto jt = at[t][j];
+        if (pos > 0 && t == p[jt->i]) continue;
+        if (vis[jt->i]) continue;
+        seq[pos] = jt->i;
+        dfs_back(jt, pos-1, t - p[jt->i], dom, n4);
+    }
+    vis[it->i] = 0;
+}
+**/
+
+bool vis[maxN];
+int seq[100];
+void dfs_back(Node* it, int pos, int t, bool& dom, bool& n4, int k) {
+    if (dom) return;
+    if (pos == k) {
+        n4 = 1;
+        dom |= check_dominance(seq, t, k);
+        return;
+    }
+    vis[it->i] = 1;
+    for (int j=it->adj.next(0); ~j; j=it->adj.next(j+1)) {
+        if (dom) break;
+        auto jt = at[t][j];
+        if (pos + 1 < k && t == p[jt->i]) continue;
+        if (vis[jt->i]) continue;
+        seq[pos] = jt->i;
+        dfs_back(jt, pos+1, t - p[jt->i], dom, n4, k);
+    }
+    vis[it->i] = 0;
+}
+
+/**
+int fs = 0;
+void four_sucessive_dominance() {
+    //int mm = 0;
+
+    /** 
+    for (int t = T-1; t >= 1; --t) {
+        for (auto it : at[t]) {
+            vis[it->i] = 1;
+            seq[0] = it->i;
+            for (auto jt = it->adj[0].begin(); jt != it->adj[0].end();) {
+                bool dom = 0;
+                need4 = 0;
+                seq[1] = jt->to->i;
+                dfs(jt->to, 2, t + p[jt->to->i], dom, 0, 3);                                                                                                                                                                                                                                                                                                                                                            
+                if (!dom && need4) {
+                    mm++;
+                    jt->to->adj[1].erase(jt->back);
+                    jt = it->adj[0].erase(jt);
+                }
+                else { 
+                    dom = 0;
+                    need4 = 0;
+                    dfs(jt->to, 2, t + p[jt->to->i], dom, 0, 4);
+                    if (!dom && need4) {
+                        mm++;
+                        jt->to->adj[0].erase(jt->back);
+                        jt = it->adj[1].erase(jt);
+                    } else {
+                        ++jt;
+                    }
+                }
+            }
+            vis[it->i] = 0;
+        }
+    }
+    /
+    //shrink();
+    int mm = 0;
+
+    for (int t=1; t<=T; ++t) {
+        for (auto it : at[t]) {
+            if (p[it->i] == t) continue;
+            seq[3] = it->i;
+            vis[it->i] = 1;
+            for (int j=it->adj.next(0); ~j; j=it->adj.next(j+1)) {
+                auto jt = at[t - p[it->i]][j];
+                if (p[it->i] + p[jt->i] == t) continue;
+                seq[2] = jt->i;
+                bool dom = 0, need4 = 0;
+                dfs_back(jt, 1, t - p[it->i] - p[jt->i], dom, need4);
+                if (!dom && need4) {
+                    erase_edge(it, jt, j);
+                    ++mm;
+                } 
+            }
+            vis[it->i] = 0;
+        }
+    }
+
+    fs++;
+    
+    
+    //cout << "erased edges fordward: " << mm << endl;
+
+    shrink();
+    shrink();
+}
+**/
+
+int fs = 0;
+void four_sucessive_dominance() {
+    //int mm = 0;
+
+    /** 
+    for (int t = T-1; t >= 1; --t) {
+        for (auto it : at[t]) {
+            vis[it->i] = 1;
+            seq[0] = it->i;
+            for (auto jt = it->adj[0].begin(); jt != it->adj[0].end();) {
+                bool dom = 0;
+                need4 = 0;
+                seq[1] = jt->to->i;
+                dfs(jt->to, 2, t + p[jt->to->i], dom, 0, 3);                                                                                                                                                                                                                                                                                                                                                            
+                if (!dom && need4) {
+                    mm++;
+                    jt->to->adj[1].erase(jt->back);
+                    jt = it->adj[0].erase(jt);
+                }
+                else { 
+                    dom = 0;
+                    need4 = 0;
+                    dfs(jt->to, 2, t + p[jt->to->i], dom, 0, 4);
+                    if (!dom && need4) {
+                        mm++;
+                        jt->to->adj[0].erase(jt->back);
+                        jt = it->adj[1].erase(jt);
+                    } else {
+                        ++jt;
+                    }
+                }
+            }
+            vis[it->i] = 0;
+        }
+    }
+    **/
+    //shrink();
+    int mm = 0;
+ 
+    for (int t=1; t<=T; ++t) {
+        for (auto it : at[t]) {
+            if (p[it->i] == t) continue;
+            //for (int k=3; k<=10; ++k) {
+                vis[it->i] = 1;
+                for (int j=it->adj.next(0); ~j; j=it->adj.next(j+1)) {
+                    auto jt = at[t - p[it->i]][j];
+                    if (p[it->i] + p[jt->i] == t) continue;
+                    seq[1] = jt->i;
+                    int k = 4;
+                    k += (it->outdeg == 1) && (jt->outdeg == 1);
+                    //k += (it->outdeg == 1);
+                    //for (int k=4; k<6; ++k) {
+                        //if ((it->adj.size() > 1 || __builtin_popcountll(it->adj.s[0]) > 1)) {
+                            //if (k == 5) continue;
+                        //} else {
+                            //if (k == 4) continue;
+                        //}
+                        //if (jt->adj.empty()) continue;
+                        //if (k >= 5 && (jt->adj.size() > 1 || __builtin_popcountll(jt->adj.s[0]) > 1)) continue;
+                        bool dom = 0, need4 = 0;
+                        dfs_back(jt, 2, t - p[it->i] - p[jt->i], dom, need4, k);
+                        if (!dom && need4) {
+                            erase_edge(it, jt, j);
+                            ++mm;
+                            //break;
+                        } 
+                    //}
+                }
+                vis[it->i] = 0;
+            //}
+        }
+    }
+    /** 
+    for (int t=1; t<=T; ++t) {
+        for (auto it : at[t]) {
+            if (p[it->i] == t) continue;
+            seq[3] = it->i;
+            vis[it->i] = 1;
+            for (int j=it->adj.next(0); ~j; j=it->adj.next(j+1)) {
+                auto jt = at[t - p[it->i]][j];
+                if (p[it->i] + p[jt->i] == t) continue;
+                seq[2] = jt->i;
+                bool dom = 0, need4 = 0;
+                dfs_back(jt, 1, t - p[it->i] - p[jt->i], dom, need4, 4);
+                if (!dom && need4) {
+                    erase_edge(it, jt, j);
+                    ++mm;
+                } 
+            }
+            vis[it->i] = 0;
+        }
+    }
+
+    for (int t=1; t<=T; ++t) {
+        for (auto it : at[t]) {
+            if (p[it->i] == t) continue;
+            seq[7] = it->i;
+            vis[it->i] = 1;
+            for (int j=it->adj.next(0); ~j; j=it->adj.next(j+1)) {
+                auto jt = at[t - p[it->i]][j];
+                if (p[it->i] + p[jt->i] == t) continue;
+                seq[6] = jt->i;
+                bool dom = 0, need4 = 0;
+                dfs_back(jt, 5, t - p[it->i] - p[jt->i], dom, need4, 8);
+                if (!dom && need4) {
+                    erase_edge(it, jt, j);
+                    ++mm;
+                } 
+            }
+            vis[it->i] = 0;
+        }
+    }
+    **/
+    shrink();
+    //shrink();
+
+    /** 
+    for (int t=1; t<=T; ++t) {
+        for (auto it : at[t]) {
+            if (p[it->i] == t) continue;
+            seq[4] = it->i;
+            vis[it->i] = 1;
+            for (int j=it->adj.next(0); ~j; j=it->adj.next(j+1)) {
+                auto jt = at[t - p[it->i]][j];
+                if (p[it->i] + p[jt->i] == t) continue;
+                seq[3] = jt->i;
+                bool dom = 0, need4 = 0;
+                dfs_back(jt, 2, t - p[it->i] - p[jt->i], dom, need4, 5);
+                if (!dom && need4) {
+                    erase_edge(it, jt, j);
+                    ++mm;
+                } 
+            }
+            vis[it->i] = 0;
+        }
+    }
+        **/
+
+    fs++;
+    
+    
+    //cout << "erased edges fordward: " << mm << endl;
+
+
+    shrink();
+}
+
+
+
+
+void update(int id, Node* no, int i, double v){
+    if (v > 1e10) return;
+    if (no->no[id][0] == -1) {
+        no->no[id][0] = i;
+        no->value[id][0] = v;
+    } else if (no->no[id][0] == i) {
+        if (no->value[id][0] > v) {
+            no->value[id][0] = v;
+        }
+    } else if (no->no[id][1] == -1) {
+        no->no[id][1] = i;
+        no->value[id][1] = v;
+        if (no->value[id][0] > no->value[id][1]){
+            swap(no->no[id][0], no->no[id][1]);
+            swap(no->value[id][0], no->value[id][1]);
+        }
+    } else if (no->no[id][1] == i) {  
+        if (no->value[id][1] > v) {
+            no->value[id][1] = v;
+        }
+        if (no->value[id][0] > no->value[id][1]) {
+            swap(no->no[id][0], no->no[id][1]);
+            swap(no->value[id][0], no->value[id][1]);
+        }   
+    } else if (no->value[id][0] > v) {
+        no->no[id][1] = no->no[id][0];
+        no->value[id][1] = no->value[id][0];
+
+        no->no[id][0] = i;
+        no->value[id][0] = v;
+    } else if (no->value[id][1] > v) {
+        no->no[id][1] = i;
+        no->value[id][1] = v;
+    }
+}
+
+void make_and_solve_graph_L2(const vector<double>& mu) {
+    //cout << "init make" << endl;
+    root = new Node(0);
+    root->no[0][0] = 0;
+    root->value[0][0] = 0;
+    //root->plen[0][0] = 0;
+    at[0].push_back(root);
+    double smu = accumulate(mu.begin(), mu.end(), 0.d);
+    for (int t=1; t<=T; ++t) {
+        for (int i=1; i<=n; ++i) {
+            if (p[i] > t) continue;
+            if (UB - 1 + EPS < h1[i][t] + H1[i][t] - (f(i, t) - mu[i]) + smu) {
+                continue;
+            }
+            auto no = new Node(i);
+            for (int j=0; j<(int)at[t - p[i]].size(); ++j) {
+                auto jt = at[t - p[i]][j];
+                if (jt->i == i) continue;
+                if (p[jt->i] + p[i] > t) continue;
+                int dji = f(jt->i, t-p[i]) + f(i, t);
+                int dij = f(i, t-p[jt->i]) + f(jt->i, t);
+                if (dji < dij || (dji == dij && od[jt->i] < od[i])) {
+                    int x = jt->no[0][0] == i; 
+                    if (UB - 1 + EPS < jt->value[0][x] + H1[i][t] + smu) {
+                        continue;
+                    } else {    
+                        update(0, no, jt->i, jt->value[0][x] + f(i, t) - mu[i]);//, jt->plen[0][x] + 1);
+                        if (no->outdeg == 0) no->adj.resize(at[t-p[i]].size());
+                        add_edge(no, jt, j);
+                    }
+                }
+            }
+            if (no->outdeg) {
+                at[t].emplace_back(no);
+            } else {
+                delete no;
+            }
+        }
+    }
+
+    broot = new Node(n+1);
+    broot->adj.resize(at[T].size());
+    at[T+1].push_back(broot);
+    for (int i=0; i<(int)at[T].size(); ++i) {
+        update(0, broot, at[T][i]->i, at[T][i]->value[0][0]);//, at[T][i]->plen[0][0]);
+        add_edge(broot, at[T][i], i);
+    }
+
+    
+    shrink(0, 1);
+    //shrink();
+    
+    //cout << broot->no[0][0] << endl;
+    
+    
+    //cout << "l2 fordward lb: " << broot->value[0][0] + accumulate(mu.begin(), mu.end(), 0.d) << endl;
+}
+
+
+void L2_fordward(const vector<double>& mu) {
+    for (auto& noi : at[0]) {
+        noi->value[0][0] = noi->value[0][1] = 1e12;
+        noi->no[0][0] = noi->no[0][1] = -1;
+    }
+    root->value[0][0] = 0;
+    root->no[0][0] = 0;
+    //root->plen[0][0] = 0;
+    for (int t=1; t<=T+1; ++t) {
+        for (auto& noi : at[t]) {
+            noi->value[0][0] = noi->value[0][1] = 1e12;
+            noi->no[0][0] = noi->no[0][1] = -1;
+            for (int j = noi->adj.next(0); ~j; j = noi->adj.next(j + 1)) {
+                auto noj = at[t - p[noi->i]][j];
+                //if (noj->no[0][noi->i == noj->no[0][0]] == -1) continue;
+                update(0, noi, noj->i, noj->value[0][noi->i == noj->no[0][0]] + f(noi->i, t) - mu[noi->i]);//, noj->plen[0][noi->i == noj->no[0][0]] + 1);
+            }
+        }
+    }
+    
+    
+    ////cout << "last node: " << broot->no[0][0] << endl;
+    
+    
+    ////cout << accumulate(mu.begin(), mu.end(), 0.d) << endl;
+    
+    
+    ////cout << "l2 fordward lb: " << broot->value[0][1] + accumulate(mu.begin(), mu.end(), 0.d) << endl;
+    
+    
+    ////cout << "l2 fordward lb: " << broot->value[0][0] + accumulate(mu.begin(), mu.end(), 0.d) << endl;
+}
+
+void L2_backward(const vector<double>& mu) {
+    for (int t=0; t<=T+1; ++t) {
+        for (auto& noi : at[t]) {
+            noi->value[1][0] = noi->value[1][1] = 1e12;
+            noi->no[1][0] = noi->no[1][1] = -1;
+        }
+    }
+    broot->value[1][0] = 0;
+    broot->no[1][0] = n+1;
+    //broot->plen[1][0] = 0;
+    for (int t=T+1; t>0; --t) {
+        for (auto& noi : at[t]) {
+            for (int j = noi->adj.next(0); ~j; j = noi->adj.next(j + 1)) {
+                //assert(noi->adj.at(j));
+                auto noj = at[t - p[noi->i]][j];
+                if (noi->no[1][noj->i == noi->no[1][0]] == -1) continue; 
+                update(1, noj, noi->i, noi->value[1][noj->i == noi->no[1][0]] + f(noi->i, t) - mu[noi->i]);//, noi->plen[1][noj->i == noi->no[1][0]] + 1);
+            }
+        }
+    }    
+    
+    
+    ////cout << "last node: " << root->no[1][0] << endl;
+    
+    
+    ////cout << "l2 backward lb: " << root->value[1][0] + accumulate(mu.begin(), mu.end(), 0.d) << endl;
+}
+
+vector<int> compute_L2_solution_fordward() {
+    
+    
+    ////cout << "compute l2 sol" << endl;
+    vector<int> s;
+    int last = n+1;
+    int cur = n+1;
+    auto it = broot;
+    int t = T;
+    while (it != root) {
+        int nxt = it->no[0][0];
+        if (last == nxt) nxt = it->no[0][1];
+        for (int j=it->adj.next(0); ~j; j=it->adj.next(j+1)) {
+            auto jt = at[t][j];
+            if (jt->i == nxt) {
+                it = jt;
+                assert(it->i == nxt);
+                break;
+            }
+        }
+        if (nxt == 0) break;
+        s.push_back(nxt);
+        t -= p[nxt];
+        last = cur;
+        cur = nxt;
+    }
+    
+    
+    ////cout << "finish" << endl;
+    reverse(s.begin(), s.end());
+    return s;
+}
+
+vector<int> compute_L2_solution_backward() {
+    vector<int> s;
+    int last = 0;
+    int cur = 0;
+    int ps = 0;
+    auto it = root;
+    int t = 0;
+    while (it != broot) {
+        int nxt = it->no[1][0];
+        if (last == nxt) nxt = it->no[1][1];
+        for (int i=0; i<(int)at[t+p[nxt]].size(); ++i) {
+            auto jt = at[t + p[nxt]][i]; 
+            if (jt->i == nxt && jt->adj.at(ps)) {
+                it = jt;
+                ps = i;
+                break;
+            }
+        }
+        if (nxt == n+1) break;
+        s.push_back(nxt);
+        t += p[nxt];
+        last = cur;
+        cur = nxt;
+    }
+    return s;
+}
+
+void elimine_states_L2L2(const vector<double>& mu) {
+    ////cout << "elimine states l2 l2" << endl;
+    double smu = accumulate(mu.begin(), mu.end(), 0.d);
+    for (int t=0; t<=T+1; ++t) {
+        for (const auto& it : at[t]) {
+            if (it->no[0][0] == -1 || it->no[1][0] == -1) {
+                for (int j = it->adj.next(0); ~j; j = it->adj.next(j + 1)) {
+                    erase_edge(it, at[t - p[it->i]][j], j);
+                }
+                continue;
+            }
+            int k = 0;
+            for (int j = it->adj.next(0); ~j; j = it->adj.next(j + 1)) {
+                
+                ++k;
+                auto jt = at[t - p[it->i]][j];
+                
+                if (jt->no[0][0] == -1 || jt->no[1][0] == -1) {
+                    erase_edge(it, jt, j);
+                    k--;
+                } else {
+                    int l1 = jt->no[0][0] == it->i, r1 = it->no[1][0] == jt->i;
+                    if (UB - 1 + EPS < jt->value[0][l1] + it->value[1][r1] + f(it->i, t) - mu[it->i] + smu) {
+                        erase_edge(it, jt, j);
+                        k--;
+                    }
+                }
+            }
+        }
+    }
+
+    //shrink();
+    shrink();
+}
+
+tuple<vector<double>, double> subgradient_L2(vector<double>& mu, double g_0=1.2, int d_T=n, int d_S=2, double eps=0.001, double k_S=0.95, double k_E=1.3) {
+    dnorm = 1.;
+    du.assign(n + 2, 0.);
+    
+    auto best_mu = mu;
+    double smu = accumulate(mu.begin(), mu.end(), 0.);
+    auto sol_lb = compute_L2_solution_fordward();
+    double cur = broot->value[0][0] + smu;
+    
+    //cout << "subgradient first lower bound: " << cur << endl;
+    double best = cur;
+    int iter = 0;   
+    int id_best = 0;
+    int niter = 0;
+    double g = g_0;
+    vector<double> G(d_T + 1);
+    G[0] = cur;
+    while (true) {
+        niter++;
+        int pre = iter;
+        iter = (iter + 1) % (d_T + 1);
+        int last = (iter + 1) % (d_T + 1);
+    
+        if (UB - cur + EPS < 1 || broot->no[0][0] == -1) {
+            
+            
+            //cout << "final UB " << UB << endl;
+            
+            
+            //cout << "Terminanted in subgradient 2 | " << UB - cur << endl; 
+            print_ub();
+            exit(0);
+        }
+        
+        int UB2 = UB;
+        vector<int> s = UB_sol;
+        if (niter % 5 == 0) {
+            s = dynasearch(upper_bound_refine(sol_lb, 15));
+            UB2 = calc_cost(s);
+        }
+
+        if (cur - best > EPS || UB2 < UB) {
+            bool ok = 1;
+            if (UB2 == UB) {
+                if (niter % 2 == 0) {
+                    ok = 0;
+                    L2_backward(mu);
+                    sol_lb = compute_L2_solution_backward();   
+                }
+
+                s = dynasearch(upper_bound_refine(sol_lb, 15, ok));
+                UB2 = calc_cost(s);
+            }
+            
+            
+            ////cout << "try to update UB: " << UB2 << endl;
+            if (UB > UB2) {
+                UB = UB2;
+                UB_sol = s;
+            }
+            if (ok) L2_backward(mu);
+            cur = max(cur, root->value[1][0] + smu);
+            elimine_states_L2L2(mu);
+        }
+ 
+        G[iter] = max(G[pre], cur);
+        
+        if (niter > d_T
+            && G[iter] * (1 - eps) < G[last]
+            && (G[iter] - G[pre]) < (UB - G[last]) * eps) {
+            break;
+        } 
+
+        if (UB - cur < 1) {
+            print_ub();
+            exit(0);
+        }
+
+        if (cur - best > eps) {
+            best = cur;
+            best_mu = mu;
+            id_best = niter;
+            if (niter != 1) g *= k_E;    
+        }
+        
+        if (niter - id_best > d_S) {
+            g *= k_S;
+        }
+
+        if (g > g_0) g = g_0;
+        if (g < 1e-4) break;
+        if (UB - cur < 1) break;
+
+        if (abs(cur - best) < 1e-5) {
+            //cout << "[" << niter << "] ";
+            //cout << fixed;
+            //cout << "LB=" << best << ' ' << "UB=" << UB << ' ' << "lk=" << g << endl; 
+        } 
+
+        update_multipliers(mu, cur, UB, sol_lb, g);
+        smu = accumulate(mu.begin(), mu.end(), 0.d);
+        L2_fordward(mu);
+        sol_lb = compute_L2_solution_fordward();
+        cur = broot->value[0][0] + smu;
+    }
+    L2_fordward(best_mu);
+    gmu = best_mu;
+    sol_lb = compute_L2_solution_fordward();
+    auto lb = calc_cost_lb(sol_lb, best_mu);
+    return tuple<vector<double>, double>(best_mu, lb);
+}
+
+set<int> select_ids;
+int n_sublimation = 0;
+ll max_edges = 1e8;
+bool sublimeL2(const vector<int>& lb_solution) {
+    
+    
+    //cout << "numero de sublimations: " << ++n_sublimation << endl;
+    
+    vector<int> new_ids;
+    vector<int> cnt(n + 1);
+    vector<int> occ(n + 1);
+    for (int t=1; t<=T; ++t) {
+        for (auto it : at[t]) {
+            occ[it->i] += 1;//it->adj.size();
+        }
+    }
+
+    if (n_edges <= (max_edges >> 6)) {
+        for (int i=1; i<=n; ++i) if (!select_ids.count(i)) new_ids.emplace_back(i);
+        sort(new_ids.begin(), new_ids.end(), [&](int i, int j) {
+            return occ[i] < occ[j];
+        });
+        new_ids.resize(min((int)new_ids.size(), 3));
+    } else {
+        for (auto x : lb_solution) cnt[x]++;
+        for (int i=1; i<=n; ++i) {
+            if (select_ids.count(i)) continue;
+            if (cnt[i] != 1) {
+                new_ids.emplace_back(i);
+            }
+        }
+        sort(new_ids.begin(), new_ids.end(), [&](int i, int j)->bool {
+            if (cnt[i] == 0 && cnt[j] == 0) return occ[i] < occ[j];
+            if (cnt[i] == 0) return 1;
+            if (cnt[j] == 0) return 0;
+            return occ[i] < occ[j];
+        });
+
+        int n_select = 1;
+        if (n_edges <= (max_edges >> 3)) n_select = 3;
+        else if (n_edges <= (max_edges >> 2)) n_select = 2;
+        new_ids.resize(min((int)new_ids.size(), n_select));
+    }
+
+    if (new_ids.empty()) {
+        UB_sol = lb_solution;
+        UB = calc_cost(lb_solution);
+        print_ub();
+        return false;
+    }
+
+    for (auto id : new_ids) {
+        select_ids.insert(id);
+
+        for (int t=0; t<=T+1; ++t) {
+            int m = at[t].size();
+            for (int j=0; j<m; ++j) {
+                auto it = at[t][j];
+                 
+                Node* no = new Node(it->i);
+                for (int i=0; i<2; ++i) 
+                    for (int j=0; j<2; ++j) {
+                        no->no[i][j] = it->no[i][j];
+                        no->value[i][j] = it->value[i][j];
+                        //no->plen[i][j] = it->plen[i][j];
+                    }   
+
+                at[t].emplace_back(no);
+
+                if (t == 0) continue;
+
+                it->adj.resize(at[t - p[it->i]].size()); //CHANGE TO REDUCE MEMORY
+                no->adj.resize(at[t - p[it->i]].size());
+                if (it->i == id) {
+                    for (int k = it->adj.next(0); ~k; k = it->adj.next(k + 1)) {
+                        add_edge(no, at[t - p[id]][k], k);
+                        erase_edge(it, at[t - p[id]][k], k);
+                    }
+                } else {
+                    int q = at[t - p[it->i]].size() / 2;
+                    for (int k = it->adj.next(0); ~k; k = it->adj.next(k + 1)) {
+                        if (at[t - p[it->i]][k]->i == id) {
+                            erase_edge(it, at[t - p[it->i]][k], k);
+                        }
+                        add_edge(no, at[t - p[it->i]][q + k], q + k);
+                    }
+                }
+            }
+        }
+        broot = at[T+1].back();
+    }
+    //cout << "constraints: " << select_ids.size() << endl;
+
+    shrink();
+    //shrink();
+    return true;
+}
+
+
+void solve() {
+    
+    
+    cout << "STAGE 1" << endl;
+    //STAGE 1
+    //set initial upper bound
+    auto upper_bound_1 = dynasearch(greedy_fordward());
+    auto upper_bound_2 = dynasearch(greedy_backward());
+    auto upper_bound_3 = dynasearch(shortest_processing_time_order());
+    auto upper_bound_4 = dynasearch(greedy_fordward2());
+    auto upper_bound_5 = dynasearch(greedy_backward2());
+    UB_sol = upper_bound_1;
+    if (calc_cost(UB_sol) > calc_cost(upper_bound_2)) {
+        UB_sol = upper_bound_2;
+    }
+    if (calc_cost(UB_sol) > calc_cost(upper_bound_3)) {
+        UB_sol = upper_bound_3;
+    }
+    if (calc_cost(UB_sol) > calc_cost(upper_bound_4)) {
+        UB_sol = upper_bound_4;
+    }
+    if (calc_cost(UB_sol) > calc_cost(upper_bound_5)) {
+        UB_sol = upper_bound_5;
+    }
+    //print_ub();   
+    UB_sol = dynasearch(UB_sol);
+    UB = calc_cost(UB_sol);
+    cin>>UB;
+    
+    
+    cout << "FIRST UPPER BOUND: " << UB << endl;
+    print_ub();
+
+    auto [mu, LB] = subgradient_L1();
+
+    
+    cout << "FIRST LOWER BOUND: " << LB << endl;
+
+    L1_fordward(mu);
+    auto sol_ford = obtain_fordward_L1();
+    
+    auto dyna_sol = dynasearch(upper_bound_refine(sol_ford, 12, 1, 0));
+    auto dyna_UB = calc_cost(dyna_sol);
+
+    if (dyna_UB < UB) {
+        UB_sol = dyna_sol;
+        UB = dyna_UB;
+    }
+    
+    cout << "SECOND UPPER BOUND: " << UB << endl;
+
+    if (UB - LB < 1) return; //cur solution in UB_sol
+
+    L1_backward(mu);
+    auto sol_back = obtain_backward_L1();
+    
+    
+    cout << "make graph" << endl;
+    make_and_solve_graph_L2(mu);
+    
+    
+    cout << "finish" << ' ' << broot->no[0][0] << endl;
+    if (broot->no[0][0] == -1) {
+        print_ub();
+        exit(0);
+    }
+    //STAGE 2
+    
+    
+    cout << "STAGE 2" << endl;    
+
+   // L2_fordward(mu);
+    //if (broot->no[0][0] == -1) {
+    //    print_ub();
+    //    exit(0);
+    //}
+    auto [mu2, LB2] = subgradient_L2(mu);
+    
+    
+    
+    cout << "SECOND LOWER BOUND 2: " << LB2 << endl;
+
+
+    //STAGE 3:
+    
+    
+    cout << "STAGE 3" << endl;
+
+    L2_fordward(mu2);
+    L2_backward(mu2);
+    auto lb_sol = compute_L2_solution_fordward();
+    auto lb = calc_cost_lb(lb_sol, mu2);
+
+    elimine_states_L2L2(mu2); 
+    four_sucessive_dominance();
+    
+    
+    cout << "init four sucessive domunance" << endl;
+    
+    
+    cout << endl;
+    int iter = 1;
+    while (true) {
+        if (!sublimeL2(lb_sol)) {
+                
+            cout << "found solution by lower bound" << endl;
+            exit(0);
+        }
+        
+        
+        cout << "current upper bound: " << UB << endl;
+        four_sucessive_dominance();
+        
+        
+        cout << "finish 4 sucessive dom" << endl;
+        vector<int> inner_sol;
+        if (iter % 2 == 0) {
+            L2_fordward(mu2);
+            if (broot->no[0][0] == -1) {
+                print_ub();
+                exit(0);
+            }
+            inner_sol = compute_L2_solution_fordward();
+        } else {
+            L2_backward(mu2);
+            if (root->no[1][0] == -1) {
+                print_ub();
+                exit(0);
+            }
+            inner_sol = compute_L2_solution_backward();
+        }
+        auto lb2 = calc_cost_lb(inner_sol, mu2);
+        
+        
+        cout << "current status: " << lb2 << ' ' << UB << endl;
+        if (UB - lb2 + EPS < 1) break;        
+        if (lb2 > lb || iter % 5 == 0) {
+
+            auto ub_sol2 = dynasearch(upper_bound_refine(inner_sol, 15, iter % 2 == 0));   
+            auto dyna_UB = calc_cost(ub_sol2);
+        
+            if (dyna_UB < UB) {
+                UB_sol = ub_sol2;
+                UB = dyna_UB;
+            }
+
+            if (lb < lb2) {
+                lb = lb2;
+                lb_sol = inner_sol;
+            }
+        }        
+        if (UB - lb < 1) break;
+        elimine_states_L2L2(mu2); 
+        iter++;
+    }
+    
+    //check memory occupation ratio M
+}
+
+int main(int argc, char** argv) {
+    // Si se proporciona un argumento, lo usamos para mostrar/ocultar la información
+    if (argc > 1) {
+        verbose_level = stoi(argv[1]);
+    }
+    
+    cout.precision(10);
+    cout<<fixed;
+    
+    // Leer el número de trabajos
+    string line;
+    getline(cin, line);
+    n = stoi(line);
+    
+    // Vector para ordenar por due dates
+    vector<tuple<int, int, int>> ord;
+    
+    println_verbose(3, "Número de trabajos: " + to_string(n));
+    
+    // Inicializar T a 0
+    T = 0;
+    
+    // Leer cada trabajo (p, d, w) en líneas separadas
+    for (int i = 1; i <= n; ++i) {
+        getline(cin, line);
+        stringstream line_ss(line);
+        line_ss >> p[i] >> d[i] >> w[i];
+        T += p[i];
+        ord.emplace_back(d[i], p[i], i);
+    }
+    
+    // Ordenar por due dates
+    sort(ord.begin(), ord.end());
+    for (int i = 0; i < n; ++i) {
+        auto [a, b, c] = ord[i];
+        od[c] = i;
+    }
+    od[0] = -1;
+    od[n+1] = n;
+    
+    // Verificar si T excede maxT
+    if (T > maxT) {
+        cout << "ERROR: T es demasiado grande (" << T << "), maxT = " << maxT << endl;
+        cout << "Este caso no es válido y debe ser rechazado." << endl;
+        cout << "0" << endl; // Devolver 0 como resultado para casos inválidos
+        return 1; // Terminar con código de error
+    }
+    
+    println_verbose(3, "cur T: " + to_string(T));
+    p[0] = 0;
+    p[n+1] = 1;
+    //cin>>UB;
+    
+    // Medir tiempo de ejecución
+    auto start_time = chrono::high_resolution_clock::now();
+    
+    solve();
+    
+    // Calcular tiempo total
+    auto end_time = chrono::high_resolution_clock::now();
+    double elapsed_seconds = chrono::duration<double>(end_time - start_time).count();
+    println_verbose(1, "Tiempo total de ejecución: " + to_string(elapsed_seconds) + " segundos");
+    
+    cout << "solution: ";
+    print_ub();
+    return 0;
+}

@@ -6,6 +6,7 @@
 #include <tuple>
 #include <utility>
 #include <set>
+#define PRECISION_PATH 1e-10
 
 const double eps = 1e-8;
 const double inf = 1e8;
@@ -57,7 +58,7 @@ struct RMPModel {
                std::cout << "add dummy edge for weight " << d << std::endl;
                /**
                 * create var A_d with cost infinity
-                * min ... oo x A_d ...
+                * min z + ... oo x A_d ...
                 * 0 <= A_d < oo
                **/  
                GRBLinExpr A_d = model->addVar(0, GRB_INFINITY, inf, GRB_CONTINUOUS);
@@ -166,7 +167,8 @@ struct RMPModel {
           }
           std::cout << "[finish]" << std::endl;
           std::cout << "dp value: " << dp[0] << std::endl;
-          if (dp[0] - 1e-10 <= 1) {
+          //10^-16
+          if (dp[0] - PRECISION_PATH <= 1) {
                return std::vector<int>();
           } 
           std::cout << "get best path from dp" << std::endl;
@@ -193,6 +195,7 @@ struct RMPModel {
           add_objective_function(problem);
           std::cout << "- add dummy edges" << std::endl;
           add_dummy_edges(problem);
+          //adding z var
           edges.emplace(problem.W, 0);
           std::cout << "- add edges to model" << std::endl;
           add_edges(problem, edges);
@@ -224,6 +227,7 @@ struct RMPModel {
           return std::vector<std::tuple<int, int, double>>();
      }
 
+     //find primal values in model for RMP problem
      std::vector<std::tuple<int, int, double>> get_opt_val(const Problem& problem) {
           //solve_simplex();
           std::vector<std::tuple<int, int, double>> opt_val;

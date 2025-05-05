@@ -17,7 +17,7 @@ struct BranchAndPrice {
           problem(problem), total_edges(problem.edges), found(false) {}
 
      void reduce_loss(std::set<std::pair<int, int>>& edges, int z) {
-          std::cout << "Calculate reduce cost" << std::endl;
+          std::cout << "Calculate reduce loss" << std::endl;
           int l_min = z * problem.W - problem.get_sum();
           std::set<std::pair<int, int>> to_erase;
           for (auto [i, j] : total_edges) {
@@ -82,7 +82,6 @@ struct BranchAndPrice {
           while (!found) {
                //reduce_loss(edges, z_LP);
                std::set<std::pair<int, int>> edges_copy = edges;
-               //creo que esta copiando aristas, hay que revisar, alguna impresion
                bandp(z_LP, edges_copy, int_solution);
                z_LP++;
           }

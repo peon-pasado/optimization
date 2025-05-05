@@ -19,10 +19,17 @@ GUROBI_LIB = -L $(GUROBI_DIR)/lib -lgurobi_c++ -lgurobi$(FLAGVERSION)
 INC = $(GUROBI_INC)
 LIB = $(CC_LIB) $(GUROBI_LIB)
 
-_OBJ = ${HOMEDIR}/main.cpp
+SSDP3_OBJ = ${HOMEDIR}/src/ssdp3/lagrangean3.o
+_OBJ = ${HOMEDIR}/src/main.cpp $(SSDP3_OBJ)
 
-main: $(_OBJ)
-	$(CC) $(CC_ARGS) $(CC_WARN) $^ -o $(HOMEDIR)/$@ $(LIB) $(INC)
+$(SSDP3_OBJ):
+	$(CC) $(CC_ARGS) $(CC_WARN) -c ${HOMEDIR}/src/ssdp3/lagrangean3.cpp -o $@
+
+main: $(SSDP3_OBJ) $(_OBJ)
+	$(CC) $(CC_ARGS) $(CC_WARN) $(_OBJ) -o $(HOMEDIR)/$@ $(LIB) $(INC)
+
+clean:
+	rm -f $(SSDP3_OBJ) main
 
 
  #-I /Library/gurobi1101/macos_universal2/include 

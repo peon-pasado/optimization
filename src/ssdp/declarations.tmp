@@ -1,0 +1,9 @@
+// Declaraciones de funciones L2
+void update(int id, Node* no, int i, double v);
+void make_and_solve_graph_L2(const vector<double>& mu);
+void L2_fordward(const vector<double>& mu);
+void L2_backward(const vector<double>& mu);
+vector<int> compute_L2_solution_fordward();
+vector<int> compute_L2_solution_backward();
+void elimine_states_L2L2(const vector<double>& mu);
+tuple<vector<double>, double> subgradient_L2(vector<double>& mu, double g_0, int d_T, int d_S, double eps, double k_S, double k_E); 
