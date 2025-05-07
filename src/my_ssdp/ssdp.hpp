@@ -17,7 +17,7 @@ int stage0() {
         copy_solution(prob->sol, sol2);
         if (prob->sol->f <= 0) return SIPS_SOLVED;
     }
-    _job_t** job = new _job_t*[prob->n];
+    std::vector<_job_t*> job(prob->n);
     /* lpt */
     for (int i = 0; i < prob->n; i++) {
         job[i] = prob->sjob[prob->n - i - 1];
@@ -29,7 +29,7 @@ int stage0() {
         if (prob->sol->f <= 0) return SIPS_SOLVED;
     }
     /* edd */
-    sort(job, job + prob->n, [](auto p, auto q) {
+    sort(job.begin(), job.end(), [](auto p, auto q) {
         if (p->d != q->d) return p->d < q->d;
         if (p->p != q->p) return p->p < q->p;
         if (p->w != q->w) return p->w < q->w;
@@ -52,7 +52,6 @@ int stage0() {
         if (prob->sol->f <= 0) return SIPS_SOLVED;
     }
     free_solution(sol2);
-    delete[] job;
     edynasearch(prob->sol);
     return prob->sol->f <= 0 ? SIPS_SOLVED : SIPS_UNSOLVED;
 }
@@ -113,7 +112,6 @@ int _stage3_loop(int *ub, double lboff, double *u) {
   }
 
   mb = lag2_get_memory_in_MB() - prob->graph->copy->mem;
-
   lbprev = lb;
   nmod = 3;
   heavy = false;
@@ -127,15 +125,16 @@ int _stage3_loop(int *ub, double lboff, double *u) {
 	      - prob->graph->ptable->mem);
         
     for(nmod = 0; mb >= 1.0 && nmod <= 3; mb /= 2.0, nmod++);
-    nmod--;
-    if (nmod == 0) nmod = 1;
+    nmod = max(1, nmod - 1);
     if (mod->n + nmod >= prob->n) {
       nmod = prob->n - mod->n - 1;
     }
     ret = lag2_assign_modifiers(1, nmod, mod);
-
-    if (ret == SIPS_INFEASIBLE) goto _loop_end;
-
+    if (ret == SIPS_INFEASIBLE) {
+        lb = *ub;
+        ret = SIPS_SOLVED;
+        break;
+    }
     lag2_reverse();
     if (mod->an == 0) {
         ret = lag2_solve_LR2m(u, *ub - lboff, tmpsol, &lb, o);
@@ -156,6 +155,7 @@ int _stage3_loop(int *ub, double lboff, double *u) {
     } else if(nmod > 1 || mb < 0.5) {
       heavy = false;
     }
+
     if(heavy && ret == SIPS_NORMAL) {
       lag2_reverse();
       ret = lag2_solve_LR2m(u, *ub - lboff, tmpsol, &lb2, o);
@@ -165,11 +165,25 @@ int _stage3_loop(int *ub, double lboff, double *u) {
       max_nedges = max(max_nedges, prob->graph->n_edges);
     }
 
-    if(ret != SIPS_NORMAL || *ub - lb < 1. - eps) {
-      goto _loop_end;
+    if (*ub - lb < 1. - eps) {
+      lb = *ub;
+      ret = SIPS_SOLVED;
+      break;
     }
 
-    if(lb2 > lb) {
+    if (ret != SIPS_NORMAL) {
+      if (ret == SIPS_OPTIMAL) {
+        if (tmpsol->f < *ub) {
+          copy_solution(prob->sol, tmpsol);
+          *ub = tmpsol->f;
+        } else if (tmpsol->f < prob->sol->f) {
+          copy_solution(prob->sol, tmpsol);
+        }
+      } else if (ret == SIPS_INFEASIBLE) {
+        lb = *ub;
+      }
+      ret = SIPS_SOLVED;
+    } else if (lb2 > lb) {
         partialdp(tmpsol2);
 	      edynasearch(tmpsol2);
         if (tmpsol2->f<*ub) {
@@ -178,6 +192,11 @@ int _stage3_loop(int *ub, double lboff, double *u) {
             lag2_free_copy();
         } else if (tmpsol2->f<prob->sol->f) {
             copy_solution(prob->sol, tmpsol2);
+        }
+        if (*ub - lb2 < 1. - eps) {
+          lb = *ub;
+          ret = SIPS_SOLVED;
+          break;
         }
     } else if(lb - lbprev > eps) {
         partialdp(tmpsol);
@@ -189,25 +208,6 @@ int _stage3_loop(int *ub, double lboff, double *u) {
         } else if (tmpsol->f < prob->sol->f) {
             copy_solution(prob->sol, tmpsol);
         }
-    }
-    if (*ub - lb2 < 1. - eps) {
-      lb = lb2;
-    }
-
-_loop_end:
-    if(ret == SIPS_OPTIMAL) {
-      if (tmpsol->f < *ub) {
-	      copy_solution(prob->sol, tmpsol);
-	      *ub = tmpsol->f;
-      } else if (tmpsol->f < prob->sol->f) {
-	      copy_solution(prob->sol, tmpsol);
-      }
-      ret = SIPS_SOLVED;
-      break;
-    } else if (ret == SIPS_INFEASIBLE || *ub - lb < 1. - eps) {
-      lb = *ub;
-      ret = SIPS_SOLVED;
-      break;
     }
   }
   return ret;
@@ -260,7 +260,7 @@ void stage3() {
 }
 
 void ssdp() {
-    //cout << "stage 0" << endl;
+   //cout << "stage 0" << endl;
     int ret = stage0();
     if (ret == SIPS_SOLVED) return;
     double lb = -inf;

@@ -16,7 +16,7 @@ struct _partdp_t {
 };
 
 void _insert_jobs_optimally( _solution_t *sol, _solution_t *psol, _solution_t *isol) {
-    int m, n;
+    int n;
     int cpsum;
     int f;
     _partdp_t *cdp;
@@ -33,10 +33,9 @@ void _insert_jobs_optimally( _solution_t *sol, _solution_t *psol, _solution_t *i
     int* ppsum = new int[psol->n + 1];
     int* ipsum = new int[nsize];
 
-    m = 0;
     cpsum = 0;
     ipsum[0] = 0;
-    for (int i = 1; i < nsize; i++) {
+    for (int i = 1, m = 0; i < nsize; i++) {
         nn[i] = _count_bit(i);
 
         int j = i ^ (i - 1);
@@ -121,8 +120,7 @@ void _insert_jobs_optimally( _solution_t *sol, _solution_t *psol, _solution_t *i
     solution_set_c(sol);
 }
 
-void insert_jobs_greedily(_solution_t *sol, int in, _job_t **ijob)
-{
+void insert_jobs_greedily(_solution_t *sol, int in, _job_t **ijob) {
 int i, j, k;
 int argmin, argmini;
 int c;
@@ -197,90 +195,42 @@ ijob[j] = ijob[j + 1];
 return;
 }
 
-void insert_ordered_jobs_greedily(_solution_t *sol, int in, _job_t **ijob) {
-    int i, j, k;
-    int argmin;
-    int c;
-    int prevf, f, minf;
+void insert_ordered_jobs_greedily(_solution_t *sol, int in, std::vector<_job_t*>& ijob) {
     solution_set_c(sol);
-    if(in == 0) {
-        return;
-    }
-
-    for(i = 0; i < in; i++) {
-    argmin = 0;
-    c = ijob[i]->p;
-    minf = ijob[i]->f[c];
-    for(k = 0; k < sol->n; k++) {
-    c += sol->job[k]->p;
-    minf += sol->job[k]->f[c];
-    }
-    prevf = 0;
-
-    for(j = 1; j <= sol->n; j++) {
-    c = sol->c[j - 1];
-    prevf += sol->job[j - 1]->f[c];
-
-    c += ijob[i]->p;
-    f = prevf + ijob[i]->f[c];
-
-    for(k = j; k < sol->n; k++) {
-    c += sol->job[k]->p;
-    f += sol->job[k]->f[c];
-    }
-
-    if (f < minf) {
-    argmin = j;
-    minf = f;
-    }
-    }
-
-    c = ijob[i]->p;
-    for(j = sol->n; j > argmin; j--) {
-    sol->c[j] = sol->c[j - 1] + c;
-    sol->job[j] = sol->job[j - 1];
-    }
-
-    if(argmin == 0) {
-        sol->c[argmin] = ijob[i]->p;
-    } else {
-        sol->c[argmin] = sol->c[argmin - 1] + ijob[i]->p;
-    }
-    sol->job[argmin] = ijob[i];
-
-    sol->f = minf;
-    sol->n++;
+    if (in == 0) return;
+    for (int i = 0; i < in; i++) {
+      int argmin = 0;
+      int c = ijob[i]->p;
+      int minf = ijob[i]->f[c];
+      for (int k = 0; k < sol->n; k++) {
+        c += sol->job[k]->p;
+        minf += sol->job[k]->f[c];
+      }
+      int prevf = 0;
+      for (int j = 1; j <= sol->n; j++) {
+        c = sol->c[j - 1];
+        prevf += sol->job[j - 1]->f[c];
+        c += ijob[i]->p;
+        int f = prevf + ijob[i]->f[c];
+        for (int k = j; k < sol->n; k++) {
+          c += sol->job[k]->p;
+          f += sol->job[k]->f[c];
+        }
+        if (f < minf) {
+          argmin = j;
+          minf = f;
+        }
+      }
+      c = ijob[i]->p;
+      for (int j = sol->n; j > argmin; j--) {
+        sol->c[j] = sol->c[j - 1] + c;
+        sol->job[j] = sol->job[j - 1];
+      }
+      sol->c[argmin] = (argmin > 0 ? sol->c[argmin - 1] : 0) + ijob[i]->p;
+      sol->job[argmin] = ijob[i];
+      sol->f = minf;
+      sol->n++;
     }  
-    return;
-}
-
-void spt(sips *prob, _solution_t *sol) {
-  for (int i = 0; i < prob->n; i++) {
-    sol->job[i] = &(prob->job[i]);
-  }
-  sol->n = prob->n;
-  sort(sol->job, sol->job + prob->n, [](auto x, auto y) {
-    if (x->p != y->p) return x->p < y->p;
-    if (x->d != y->d) return x->d < y->d;
-    if (x->w != y->w) return x->w < y->w;
-    return x->no < y->no;
-  });
-  solution_set_c(sol);
-}
-
-void edd(sips *prob, _solution_t *sol) {
-  for (int i = 0; i < prob->n; i++) {
-    sol->job[i] = &(prob->job[i]);
-  }
-  sol->n = prob->n;
-  sort(sol->job, sol->job + prob->n, [](auto p, auto q) {
-    if (p->d != q->d) return p->d < q->d;
-    if (p->p != q->p) return p->p < q->p;
-    if (p->w != q->w) return p->w < q->w;
-    return p->no < q->no;
-});
-
-  solution_set_c(sol);
 }
 
 void partialdp(_solution_t *sol)
@@ -289,7 +239,7 @@ void partialdp(_solution_t *sol)
   int *e;
   _solution_t *psol, *isol;
 
-  e = new int[prob->n];
+  e = new int[prob->n]{};
   psol = create_solution();
   isol = create_solution();
 

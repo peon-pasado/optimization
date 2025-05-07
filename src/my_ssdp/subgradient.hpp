@@ -217,7 +217,7 @@ int subgradient_LR2adj(double *lb) {
     if (iter % 10 == 1) {
       partialdp(csol);
 	    edynasearch(csol);
-      bosq = inf;
+      bosq = inf; 
     } else csol->f = inf;
 
     if (prob->sol->f > csol->f || pflag) {
@@ -227,6 +227,7 @@ int subgradient_LR2adj(double *lb) {
       }
       if (prob->sol->f > csol->f) 
         copy_solution(prob->sol, csol);
+
       if (prob->sol->f - lmax < 1. - eps) {
         ret = SIPS_SOLVED;
         break;

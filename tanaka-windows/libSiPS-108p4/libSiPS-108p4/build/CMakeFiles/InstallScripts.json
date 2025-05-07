@@ -1,0 +1,9 @@
+{
+	"InstallScripts" : 
+	[
+		"C:/Users/mmini/Documents/optimization/tanaka-windows/libSiPS-108p4/libSiPS-108p4/build/cmake_install.cmake",
+		"C:/Users/mmini/Documents/optimization/tanaka-windows/libSiPS-108p4/libSiPS-108p4/build/SiPS/cmake_install.cmake",
+		"C:/Users/mmini/Documents/optimization/tanaka-windows/libSiPS-108p4/libSiPS-108p4/build/SiPSi/cmake_install.cmake"
+	],
+	"Parallel" : false
+}

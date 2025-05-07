@@ -6,7 +6,7 @@
 #include "benv.hpp"
 
 
-void problem_free_graph(sips *prob) {
+void problem_free_graph() {
   if (prob && prob->graph) {
     delete prob->graph->copy->bnode;
     prob->graph->copy->bnode = nullptr;
@@ -30,33 +30,33 @@ void problem_free_graph(sips *prob) {
 }
 
 void problem_create_graph() {
-  problem_free_graph(prob);
+  problem_free_graph();
   prob->graph = new _graph_t();
   prob->graph->hdir = SIPS_FORWARD;
   prob->graph->copy = new _cgraph_t();
 }
 
 double lag2_get_real_memory_in_MB() {
-  double mem = (double) (prob->T + 2)*sizeof(_node2m_t *);
+  double use_mem = (double) (prob->T + 2)*sizeof(_node2m_t *);
   if (!prob->graph->bnode) {
-    mem += prob->graph->bnode->used_memory() 
+    use_mem += prob->graph->bnode->used_memory() 
         + prob->graph->bedge->used_memory();
   }
-  mem /= (double) (1<<20);
-  mem += prec_get_memory_in_MB();
-  mem += prob->graph->copy->rmem;
-  return mem;
+  use_mem /= (double) (1<<20);
+  use_mem += prec_get_memory_in_MB();
+  use_mem += prob->graph->copy->rmem;
+  return use_mem;
 }
 
 double lag2_get_memory_in_MB() {
-  double mem;
-  mem = (prob->T + 2)*sizeof(_node2m_t *);
-  mem += sizeof(_edge2m_t) * prob->graph->n_edges
+  double use_mem;
+  use_mem = (prob->T + 2)*sizeof(_node2m_t *);
+  use_mem += sizeof(_edge2m_t) * prob->graph->n_edges
     + sizeof(_node2m_t) * prob->graph->n_nodes;
-  mem /= (1<<20);
-  mem += prec_get_memory_in_MB();
-  mem += prob->graph->copy->mem;
-  return mem;
+  use_mem /= (1<<20);
+  use_mem += prec_get_memory_in_MB();
+  use_mem += prob->graph->copy->mem;
+  return use_mem;
 }
 
 void _lag2_recover_nodes_forward() {

@@ -8,15 +8,13 @@
 
 #define THREE_COST_CHECK(j0, j1, j2) {					\
     g = THREE_COST(j0, j1, j2);						\
-    if (g < f							\
-       || (g == f						\
-	   && prob->sjob[j[j0]]->tno < prob->sjob[j[0]]->tno)) {	\
-      return(1);							\
+    if (g < f	|| (g == f						\
+	        && prob->sjob[j[j0]]->tno < prob->sjob[j[0]]->tno)) {	\
+      return 1;							\
     }									\
   }
 
-char check_three_cost(int *j, int s, int c)
-{
+char check_three_cost(int *j, int s, int c) {
   int f, g;
 
   /* 0->1->2 */
@@ -28,7 +26,7 @@ char check_three_cost(int *j, int s, int c)
   /* 2->1->0 */
   THREE_COST_CHECK(2, 1, 0);
 
-  return(0);
+  return 0;
 }
 
 #define FOUR_COST(j0, j1, j2, j3)					\
@@ -5732,36 +5730,25 @@ char check_six_cost_backward(int *j, int s, int c)
 
   return(0);
 }
-
-
-char _check_none(int c, int jn, _node2m_t *n) {
-    return 0;
-  }
   
-char _check_three_forward(int c, int jn, _node2m_t *n)
-  {
-    int s;
-    int j[3];
-    _edge2m_t *e;
-  
-    if((j[1] = n->j[0]) == prob->n) return 0;
-  
-    j[2] = jn;
-    s = c - prob->sjob[j[2]]->p - prob->sjob[j[1]]->p;
-    for(e = n->e; e; e = e->next) {
-      if (e->n->ty & 4) continue;
-      if((j[0] = e->n->j[0]) == prob->n) {
-        return 0;
-      } else if(j[0] == j[2]) {
-        continue;
-      }
-      if(!check_three_cost(j, s - prob->sjob[j[0]]->p, c)) {
-        return(0);
-      }
+char _check_three_forward(int c, int jn, _node2m_t *n) {
+  int j[3];
+  if((j[1] = n->j[0]) == prob->n) return 0;
+  j[2] = jn;
+  int s = c - prob->sjob[j[2]]->p - prob->sjob[j[1]]->p;
+  for (auto e = n->e; e; e = e->next) {
+    if (e->n->ty & 4) continue;
+    if ((j[0] = e->n->j[0]) == prob->n) {
+      return 0;
+    } else if (j[0] == j[2]) {
+      continue;
     }
-  
-    return(1);
-  }
+    if (!check_three_cost(j, s - prob->sjob[j[0]]->p, c)) {
+      return 0;
+    }
+  }  
+  return 1;
+}
   
   char _check_four_forward(int c, int jn, _node2m_t *n)
   {
@@ -5861,21 +5848,21 @@ char _check_three_forward(int c, int jn, _node2m_t *n)
       if(!check_three_cost(j + 3, s1, c)) {
           for(e2 = e->n->e; e2; e2 = e2->next) {
               if (e2->n->ty & 4) continue;
-      if((j[2] = e2->n->j[0]) == prob->n) {
-        return 0;
-      } else if (j[2] == j[5] || j[2] == j[4]) {
-        continue;
-      }
+              if((j[2] = e2->n->j[0]) == prob->n) {
+                return 0;
+              } else if (j[2] == j[5] || j[2] == j[4]) {
+                continue;
+              }
   
-      s2 = s1 - prob->sjob[j[2]]->p;
-      if (!check_four_cost_forward(j + 2, s2, c)) {
-        for(e3 = e2->n->e; e3; e3 = e3->next) {
-          if (e3->n->ty & 4) continue;
-          if((j[1] = e3->n->j[0]) == prob->n) {
-            return 0;
-          } else if (j[1] == j[5] || j[1] == j[4] || j[1] == j[3]) {
-            continue;
-          }
+              s2 = s1 - prob->sjob[j[2]]->p;
+              if (!check_four_cost_forward(j + 2, s2, c)) {
+                for (e3 = e2->n->e; e3; e3 = e3->next) {
+                  if (e3->n->ty & 4) continue;
+                  if((j[1] = e3->n->j[0]) == prob->n) {
+                    return 0;
+                  } else if (j[1] == j[5] || j[1] == j[4] || j[1] == j[3]) {
+                    continue;
+                  }
   
           s3 = s2 - prob->sjob[j[1]]->p;
           if(!check_five_cost_forward(j + 1, s3, c)) {

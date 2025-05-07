@@ -2,6 +2,7 @@
 #include "models.hpp"
 #include "utils/solution.hpp"
 #include <algorithm>
+#include <set>
 
 typedef struct {
     int j;
@@ -11,35 +12,26 @@ typedef struct {
 
 
 int _edynasearch_internal(_solution_t *sol, int lw, _job_t **job, _dyna_dp_t *dp) {
-    int vv;
-    int c;
-
     if(lw == 0) {
         dp[0].f = 0;
         dp[0].j = -1;
         dp[0].ty = 0;
     }
-
-    for(int i = lw + 1; i <= sol->n; ++i) {
+    for (int i = lw + 1; i <= sol->n; ++i) {
         dp[i].j = i - 1;
         dp[i].f = dp[i - 1].f + sol->job[i - 1]->f[sol->c[i - 1]];
         dp[i].ty = 0;
 
         /* PI */
         for (int j = 0; j <= i - 2; ++j) {
-            if(j > 0) {
-                c = sol->c[j - 1] + sol->job[i - 1]->p;
-            } else {
-                c = sol->job[i - 1]->p;
-            }
-            vv = dp[j].f + sol->job[i - 1]->f[c];
+            int c = sol->job[i - 1]->p + (j > 0 ? sol->c[j - 1] : 0);
+            int vv = dp[j].f + sol->job[i - 1]->f[c];
             for (int k = j + 1; k <= i - 2; ++k) {
                 c += sol->job[k]->p;
                 vv += sol->job[k]->f[c];
             }
             c += sol->job[j]->p;
             vv += sol->job[j]->f[c];
-
             if (vv < dp[i].f) {
                 dp[i].f = vv;
                 dp[i].j = j;
@@ -49,18 +41,13 @@ int _edynasearch_internal(_solution_t *sol, int lw, _job_t **job, _dyna_dp_t *dp
 
         /* EBSR */
         for (int j = 0; j <= i - 3; j++) {
-            if(j > 0) {
-                c = sol->c[j - 1] + sol->job[i - 1]->p;
-            } else {
-                c = sol->job[i - 1]->p;
-            }
-            vv = dp[j].f + sol->job[i - 1]->f[c];
+            int c = sol->job[i - 1]->p + (j > 0 ? sol->c[j - 1] : 0);
+            int vv = dp[j].f + sol->job[i - 1]->f[c];
             for (int k = j; k <= i - 2; k++) {
                 c += sol->job[k]->p;
                 vv += sol->job[k]->f[c];
             }
-
-            if(vv < dp[i].f) {
+            if (vv < dp[i].f) {
                 dp[i].f = vv;
                 dp[i].j = j;
                 dp[i].ty = 2;
@@ -69,12 +56,8 @@ int _edynasearch_internal(_solution_t *sol, int lw, _job_t **job, _dyna_dp_t *dp
 
         /* EFSR */
         for (int j = 0; j <= i - 3; j++) {
-            if(j > 0) {
-                c = sol->c[j - 1];
-            } else {
-                c = 0;
-            }
-            vv = dp[j].f;
+            int c = (j > 0) ? sol->c[j - 1] : 0; 
+            int vv = dp[j].f;
             for (int k = j + 1; k <= i - 1; k++) {
                 c += sol->job[k]->p;
                 vv += sol->job[k]->f[c];
@@ -88,6 +71,7 @@ int _edynasearch_internal(_solution_t *sol, int lw, _job_t **job, _dyna_dp_t *dp
             }
         }
 
+        /*reverse range*/
         for (int j = 0; j <= i - 2; j++) {
             int c = (j > 0) ? sol->c[j - 1] : 0;
             int vv = dp[j].f;
@@ -136,7 +120,7 @@ int _edynasearch_internal(_solution_t *sol, int lw, _job_t **job, _dyna_dp_t *dp
         i = dp[i].j;
     }
 
-    for(lw = 0; lw < sol->n; lw++) {
+    for (lw = 0; lw < sol->n; lw++) {
         if(job[lw]->no != sol->job[lw]->no) {
             break;
         }
@@ -155,12 +139,12 @@ void edynasearch(_solution_t *sol) {
 
     dp = new _dyna_dp_t[sol->n + 1];
     job = new _job_t*[sol->n];
-
+ 
     f = sol->f;
     i = 0;
     while (1) {
         i = _edynasearch_internal(sol, i, job, dp);
-        if (f == sol->f) break;
+        if (f <= sol->f) break;
         f = sol->f;
     }
 

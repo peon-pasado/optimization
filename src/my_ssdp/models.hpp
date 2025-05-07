@@ -6,15 +6,14 @@
 
 const double eps = 1e-5;
 const double mem = 1536;
+int verbosity;
 
 typedef struct {
   int no;                 /* internal number                                */
   int rno;                /* real number                                    */
   int tno;                /* tie-breaking order                             */
   int sno;                /* order in the optimal solution                  */
-  char *name;             /* name                                           */
   int p;                  /* processing time                                */
-  int rd;                 /* real duedate                                   */
   int d;                  /* internal duedate                               */
   int w;                             
   int *f;              /* vector of objective function value             */
@@ -138,14 +137,11 @@ typedef struct {
 
 typedef struct sips {
   int n;                  /* number of jobs                                 */
-  int psum;               /* total processing time                          */
   int pmin;               /* minimum processing time                        */
-  int pmax;               /* maximum processing time                        */
-  int dmin;               /* minimum duedate                                */
-  int dmax;               /* maximum duedate                                */
+  int pmax;               /* maximum processing time                        */                      
   int T;                  /* end of scheduling horizon                      */
-  _job_t *job;            /* job data                                       */
-  _job_t **sjob;          /* SPT sequence                                   */
+  std::vector<_job_t> job;            /* job data                                       */
+  std::vector<_job_t*> sjob;          /* SPT sequence                                   */
   _graph_t *graph;        /* graph corresponding to relaxations             */
   _solution_t *sol;       /* solution                                       */
   int niseq;              /* length of user specified initial sequence      */

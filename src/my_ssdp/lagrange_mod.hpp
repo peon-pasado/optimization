@@ -1917,7 +1917,6 @@ int _lag2_solve_LR2m_backward(double *u, double ub, unsigned char eflag) {
 
 int _lag2_get_sol_LR2m_forward(double *u, _solution_t *sol, double *lb, unsigned int *o) {
   int t;
-  int i;
   int ty, pty;
   int ret;
   _node2m_t **node, *cnode;
@@ -1936,7 +1935,7 @@ int _lag2_get_sol_LR2m_forward(double *u, _solution_t *sol, double *lb, unsigned
   }
 
   *lb = cnode->v[0] + fixed->ftail;
-  for(i = 0; i < fixed->ntail; i++) {
+  for (int i = 0; i < fixed->ntail; i++) {
     *lb -= u[fixed->job[prob->n - i - 1]->no];
   }
 
@@ -1954,10 +1953,10 @@ int _lag2_get_sol_LR2m_forward(double *u, _solution_t *sol, double *lb, unsigned
 
     memset(o, 0, prob->n*sizeof(unsigned int));
 
-    for(i = 0; i < fixed->nhead; i++) {
+    for (int i = 0; i < fixed->nhead; i++) {
       o[fixed->job[i]->no]++;
     }
-    for(i = 0; i < fixed->ntail; i++) {
+    for (int i = 0; i < fixed->ntail; i++) {
       o[fixed->job[prob->n - i - 1]->no]++;
     }
 
@@ -1971,7 +1970,7 @@ int _lag2_get_sol_LR2m_forward(double *u, _solution_t *sol, double *lb, unsigned
       ty = pty;
     }
 
-    for (i = 0; i < prob->n; i++) {
+    for (int i = 0; i < prob->n; i++) {
       if (o[i] != 1) {
 	      ret = SIPS_NORMAL;
 	      break;
@@ -1983,16 +1982,16 @@ int _lag2_get_sol_LR2m_forward(double *u, _solution_t *sol, double *lb, unsigned
 
   sol->n = 0;
   sol->f = fixed->ftail;
-  for(i = 0; i < fixed->ntail; i++) {
+  for (int i = 0; i < fixed->ntail; i++) {
     sol->job[sol->n] = fixed->job[prob->n - i - 1];
     sol->c[sol->n++] = fixed->c[prob->n - i - 1];
   }
   if (o) {
     memset(o, 0, prob->n*sizeof(unsigned int));
-    for(i = 0; i < fixed->nhead; i++) {
+    for (int i = 0; i < fixed->nhead; i++) {
       o[fixed->job[i]->no]++;
     }
-    for(i = 0; i < fixed->ntail; i++) {
+    for (int i = 0; i < fixed->ntail; i++) {
       o[fixed->job[prob->n - i - 1]->no]++;
     }
 
@@ -2010,7 +2009,7 @@ int _lag2_get_sol_LR2m_forward(double *u, _solution_t *sol, double *lb, unsigned
       ty = pty;
     }
 
-    for (i = 0; i < prob->n; i++) {
+    for (int i = 0; i < prob->n; i++) {
       if (o[i] != 1) {
 	      ret = SIPS_NORMAL;
 	      break;
@@ -2034,7 +2033,7 @@ int _lag2_get_sol_LR2m_forward(double *u, _solution_t *sol, double *lb, unsigned
   }
 
   sol->f += fixed->fhead;
-  for(i = fixed->nhead - 1; i >= 0; i--) {
+  for (int i = fixed->nhead - 1; i >= 0; i--) {
     sol->job[sol->n] = fixed->job[i];
     sol->c[sol->n++] = fixed->c[i];
   }
@@ -2048,7 +2047,6 @@ int _lag2_get_sol_LR2m_forward(double *u, _solution_t *sol, double *lb, unsigned
 int _lag2_get_sol_LR2m_backward(double *u, _solution_t *sol,
 				double *lb, unsigned int *o) {
   int t;
-  int i;
   int ty, pty;
   int ret;
   _node2m_t **node, *cnode;
@@ -2065,11 +2063,11 @@ int _lag2_get_sol_LR2m_backward(double *u, _solution_t *sol,
   }
 
   *lb = cnode->v[0] + fixed->fhead;
-  for(i = 0; i < fixed->nhead; i++) {
+  for (int i = 0; i < fixed->nhead; i++) {
     *lb -= u[fixed->job[i]->no];
   }
 
-  if(*lb > dinf2) {
+  if (*lb > dinf2) {
     if (sol) sol->f = inf;
     return SIPS_INFEASIBLE;
   }
@@ -2081,10 +2079,10 @@ int _lag2_get_sol_LR2m_backward(double *u, _solution_t *sol,
   if (!sol) {
     if(!o) return SIPS_NORMAL;
     memset(o, 0, prob->n*sizeof(unsigned int));
-    for(i = 0; i < fixed->nhead; i++) {
+    for (int i = 0; i < fixed->nhead; i++) {
       o[fixed->job[i]->no]++;
     }
-    for(i = 0; i < fixed->ntail; i++) {
+    for (int i = 0; i < fixed->ntail; i++) {
       o[fixed->job[prob->n - i - 1]->no]++;
     }
     while (cnode->j[0] < prob->n) {
@@ -2097,7 +2095,7 @@ int _lag2_get_sol_LR2m_backward(double *u, _solution_t *sol,
       ty = pty;
     }
 
-    for (i = 0; i < prob->n; i++) {
+    for (int i = 0; i < prob->n; i++) {
       if (o[i] != 1) {
         ret = SIPS_NORMAL;
         break;
@@ -2108,17 +2106,17 @@ int _lag2_get_sol_LR2m_backward(double *u, _solution_t *sol,
 
   sol->n = 0;
   sol->f = fixed->fhead;
-  for(i = 0; i < fixed->nhead; i++) {
+  for (int i = 0; i < fixed->nhead; i++) {
     sol->job[sol->n] = fixed->job[i];
     sol->c[sol->n++] = fixed->c[i];
   }
 
   if (o) {
     memset(o, 0, prob->n*sizeof(unsigned int));
-    for(i = 0; i < fixed->nhead; i++) {
+    for (int i = 0; i < fixed->nhead; i++) {
       o[fixed->job[i]->no]++;
     }
-    for(i = 0; i < fixed->ntail; i++) {
+    for (int i = 0; i < fixed->ntail; i++) {
       o[fixed->job[prob->n - i - 1]->no]++;
     }
 
@@ -2136,7 +2134,7 @@ int _lag2_get_sol_LR2m_backward(double *u, _solution_t *sol,
       ty = pty;
     }
 
-    for(i = 0; i < prob->n; i++) {
+    for (int i = 0; i < prob->n; i++) {
       if (o[i] != 1) {
         ret = SIPS_NORMAL;
         break;
@@ -2159,7 +2157,7 @@ int _lag2_get_sol_LR2m_backward(double *u, _solution_t *sol,
     ret = SIPS_NORMAL;
   }
   sol->f += fixed->ftail;
-  for(i = fixed->ntail - 1; i >= 0; i--) {
+  for (int i = fixed->ntail - 1; i >= 0; i--) {
     sol->job[sol->n] = fixed->job[prob->n - i - 1];
     sol->c[sol->n++] = fixed->c[prob->n - i - 1];
   }

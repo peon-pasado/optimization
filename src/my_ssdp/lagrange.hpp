@@ -45,16 +45,16 @@ void lag_free_LR2adj_solver() {
 }
 
 double lag_get_memory_in_MB() {
-  double mem = 0.0;
+  double use_mem = 0.0;
   if (prob->graph->node1) {
-    mem += (prob->T + 1)* sizeof(_node1_t);
+    use_mem += (prob->T + 1)* sizeof(_node1_t);
   }
   if (prob->graph->node2) {
-    mem += (prob->T + 2) * sizeof(_node2_t *);
-    mem += prob->graph->bnode->used_memory();
+    use_mem += (prob->T + 2) * sizeof(_node2_t *);
+    use_mem += prob->graph->bnode->used_memory();
   }
-  mem /= (1<<20);
-  return mem;
+  use_mem /= (1<<20);
+  return use_mem;
 }
 
 void lag_free() {
