@@ -13,6 +13,9 @@ int stage0() {
     /* spt */
     sol2->n = 0;
     insert_ordered_jobs_greedily(sol2, prob->n, prob->sjob);
+    if (verbosity >= 3) {
+      std::cout << "spt: " << sol2->f << std::endl;
+    }
     if (prob->sol->n < prob->n || sol2->f < prob->sol->f) {
         copy_solution(prob->sol, sol2);
         if (prob->sol->f <= 0) return SIPS_SOLVED;
@@ -24,6 +27,9 @@ int stage0() {
     }
     sol2->n = 0;
     insert_ordered_jobs_greedily(sol2, prob->n, job);
+    if (verbosity >= 3) {
+      std::cout << "lpt: " << sol2->f << std::endl;
+    }
     if (sol2->f < prob->sol->f) {
         copy_solution(prob->sol, sol2);
         if (prob->sol->f <= 0) return SIPS_SOLVED;
@@ -37,6 +43,9 @@ int stage0() {
     });
     sol2->n = 0;
     insert_ordered_jobs_greedily(sol2, prob->n, job);
+    if (verbosity >= 3) {
+      std::cout << "edd: " << sol2->f << std::endl;
+    }
     if (sol2->f < prob->sol->f) {
         copy_solution(prob->sol, sol2);
         if (prob->sol->f <= 0) return SIPS_SOLVED;
@@ -47,12 +56,21 @@ int stage0() {
     }
     sol2->n = 0;
     insert_ordered_jobs_greedily(sol2, prob->n, job);
+    if (verbosity >= 3) {
+      std::cout << "ldd: " << sol2->f << std::endl;
+    }
     if (sol2->f < prob->sol->f) {
         copy_solution(prob->sol, sol2);
         if (prob->sol->f <= 0) return SIPS_SOLVED;
     }
     free_solution(sol2);
+    if (verbosity >= 3) {
+      std::cout << "[exec dynasearch]" << std::endl;
+    }
     edynasearch(prob->sol);
+    if (verbosity >= 2) {
+      std::cout << "UB=" << prob->sol->f << std::endl;
+    }
     return prob->sol->f <= 0 ? SIPS_SOLVED : SIPS_UNSOLVED;
 }
 
@@ -115,6 +133,7 @@ int _stage3_loop(int *ub, double lboff, double *u) {
   lbprev = lb;
   nmod = 3;
   heavy = false;
+  int iter = 1;
   while (ret == SIPS_NORMAL) {
     lbprev = max(lbprev, lb);
     mb = (mem 
@@ -150,6 +169,13 @@ int _stage3_loop(int *ub, double lboff, double *u) {
               ((double) mem 
                 - prob->graph->copy->mem
 	              - prob->graph->ptable->mem);
+    if (verbosity >= 3) {
+      std::cout << "[" << std::setw(3) << iter << "]"
+                << " mem=" << lag2_get_memory_in_MB() << "mB" 
+                << " nodes=" << prob->graph->n_nodes
+                << " edges=" << prob->graph->n_edges
+                << std::endl;
+    }
     if(nmod == 1 && mb >= 0.75) {
       heavy = true;
     } else if(nmod > 1 || mb < 0.5) {
@@ -209,6 +235,7 @@ int _stage3_loop(int *ub, double lboff, double *u) {
             copy_solution(prob->sol, tmpsol);
         }
     }
+    iter++;
   }
   return ret;
 }
@@ -242,11 +269,21 @@ void stage3() {
     int f = prob->sol->f;
     for (int iter = 1;; iter++) {
         int ub = max(round(lbprev), ceil(lbbest));
+        if (verbosity >= 3) {
+          std::cout << "[TRY UB] " << ub << std::endl;
+        }
         if (prob->sol->f <= ub) {
-            ub = prob->sol->f;
-            lag2_pop_nodes();
-        } else lag2_recover_nodes();
-
+          ub = prob->sol->f;
+          lag2_pop_nodes();
+          if (verbosity >= 3) {
+            std::cout << "[POP NODES]" << std::endl;
+          }
+        } else {
+          lag2_recover_nodes();
+          if (verbosity >= 3) {
+            std::cout << "[RECOVER NODES]" << std::endl;
+          }
+        }
         if (iter >= 3 && prob->sol->f==ub && prob->sol->f<=f) {
             edynasearch(prob->sol);
             ub = min(ub, prob->sol->f);
@@ -260,19 +297,19 @@ void stage3() {
 }
 
 void ssdp() {
-   //cout << "stage 0" << endl;
+    if (verbosity >= 2) std::cout << "[stage 0]" << std::endl;
     int ret = stage0();
     if (ret == SIPS_SOLVED) return;
     double lb = -inf;
-    //cout << "stage 1" << endl;
+    if (verbosity >= 2) std::cout << "[stage 1]" << std::endl;
     ret = stage1(&lb);
     //cout << "current lb: "<< lb << endl;
     //cout << "current ub: "<<prob->sol->f <<endl;
     if (ret != SIPS_UNSOLVED) return;
-    //cout << "stage 2" << endl;
+    if (verbosity >= 2) std::cout << "[stage 2]" << std::endl;
     ret = stage2(&lb);
     //cout << SIPS_UNSOLVED << endl;
     if (ret != SIPS_UNSOLVED) return;
-    //cout << "stage 3" << endl;
+    if (verbosity >= 2) std::cout << "[stage 3]" << std::endl;
     stage3();
 }

@@ -58,14 +58,13 @@ void read_problem() {
 }
 
 int main(int argc, char **argv) {
-  int verbosity = 0;  // Valor por defecto
 
     for (int i = 1; i < argc; ++i) {
         if (std::string(argv[i]) == "-v") {
             if (i + 1 < argc) {
                 verbosity = std::atoi(argv[i + 1]);
-                if (verbosity < 0 || verbosity > 2) {
-                    std::cerr << "Error: valor para -v debe ser 0, 1 o 2.\n";
+                if (verbosity < 0 || verbosity > 3) {
+                    std::cerr << "Error: valor para -v debe ser 0, 1, 2 o 3.\n";
                     return 1;
                 }
                 ++i; // Saltamos el número
@@ -82,9 +81,13 @@ int main(int argc, char **argv) {
   setup_problem();
   solve();
   auto s = prob->sol;
-  std::cout << s->f << '\n';
-  //for (int i=0; i<s->n; ++i) {
-  //  std::cout << s->job[i]->rno << ",\n"[i+1==s->n];
-  //}
+  if (verbosity >= 1) {
+    std::cout << s->f << '\n';
+  }
+  if (verbosity >= 2) {
+    for (int i=0; i<s->n; ++i) {
+      std::cout << s->job[i]->rno << ",\n"[i+1==s->n];
+    }
+  }
   return 0;
 }

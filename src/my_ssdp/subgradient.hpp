@@ -6,7 +6,6 @@
 #include "dynasearch.hpp"
 #include <cmath>
 #include "lagrange.hpp"
-#include <iostream>
 #include <numeric>
 using namespace std;
 
@@ -17,6 +16,19 @@ const double expand2 = 1.30;
 const double shrink1 = 0.9;
 const double shrink2 = 0.9;
 
+
+/**
+ * update multiplier for conjugate subgradient
+ * 
+ * d: direction vector
+ * dnorm: d norm
+ * o: ocurrence for every job in lagrange relaxation
+ * cl: current lowerbound
+ * u: current multipliers
+ * lk: regulator constant
+ * prob->n: number of jobs
+ * prob->sol->f: current upper bound
+ */
 void update_multipliers(double& dnorm, int* o, double* d, double cl, double lk, double* u) {
     int osq = accumulate(o, o + prob->n, 0, [](int sum, int oi) {return sum + (1-oi)*(1-oi);});
     double ksi = sqrt(osq / dnorm);
@@ -68,6 +80,13 @@ int subgradient_LR1(double *lb) {
             nupdated++;
             lmax = cl;
             copy(u, u + prob->n, ubest);
+            if (verbosity >= 3 && (iter == 1 || iter >= prob->n)) {
+              std::cout << "[" << std::setw(3) << iter << "]" 
+                  << " LB=" << std::fixed << std::setprecision(2) << cl
+                  << " UB=" << prob->sol->f 
+                  << " lk=" << std::fixed << std::setprecision(2) << lk 
+                  << std::endl;
+            }
             if(iter > 1) lk = min(1.0, lk * expand1);
         } else if(lmax2 >= cl - 1 + eps) updated++;
 
@@ -130,6 +149,11 @@ int subgradient_LR1(double *lb) {
   delete[] gap_table;
   free_solution(tmpsol);
   free_solution(csol);
+  if (verbosity >= 2) {
+    std::cout << "results: " << std::endl
+        << "- LB=" << std::fixed << std::setprecision(2) << lmax << std::endl
+        << "- UB=" << prob->sol->f << std::endl;
+  }
   *lb = lmax;
   return ret;
 }
@@ -185,7 +209,14 @@ int subgradient_LR2adj(double *lb) {
       pflag = 1;
       lmax = cl;
       memcpy(ubest, u, prob->n * sizeof(double));
-
+      if (verbosity >= 3 && (iter == 1 || iter >= prob->n)) {
+        std::cout << "[" << std::setw(3) << iter << "]" 
+            << " LB=" << std::fixed << std::setprecision(2) << cl
+            << " UB=" << prob->sol->f 
+            << " lk=" << std::fixed << std::setprecision(2) << lk 
+            << " nodes= " << prob->graph->n_nodes 
+            << std::endl;
+      }
       if(iter > 1) {
 	      lk *= expand2;
 	      if(lk > 1.0) {
@@ -197,6 +228,9 @@ int subgradient_LR2adj(double *lb) {
     if(iter > 1) lmax2 = max(lmax2, cl);
     if(ret2 != SIPS_NORMAL) {
       if(ret2 == SIPS_OPTIMAL && prob->sol->f > tmpsol->f) {
+        if (verbosity >= 3) {
+          std::cout << "finish in stage 2. [optimal]" << std::endl;
+        }
         copy_solution(prob->sol, tmpsol);
       }
       ret = SIPS_SOLVED;
@@ -216,7 +250,13 @@ int subgradient_LR2adj(double *lb) {
     }
     if (iter % 10 == 1) {
       partialdp(csol);
-	    edynasearch(csol);
+      if (verbosity >= 3) {
+        std::cout << "[exec dynasearch]";
+      }
+      edynasearch(csol);
+      if (verbosity >= 3) {
+        std::cout << "=" << csol->f << std::endl;
+      }
       bosq = inf; 
     } else csol->f = inf;
 
@@ -270,7 +310,13 @@ int subgradient_LR2adj(double *lb) {
 
   if(ret == SIPS_UNSOLVED) {
     tmpsol->f = prob->sol->f;
+    if (verbosity >= 3) {
+      std::cout << "[exec dynasearch]";
+    }
     edynasearch(prob->sol);
+    if (verbosity >= 3) {
+      std::cout << "=" << prob->sol->f << std::endl;
+    }
     if (prob->sol->f - lmax < 1.0 - eps) {
       ret = SIPS_SOLVED;
     }
@@ -305,6 +351,11 @@ int subgradient_LR2adj(double *lb) {
   delete[] gap_table;
   free_solution(tmpsol);
   free_solution(csol);
+  if (verbosity >= 2) {
+    std::cout << "results: " << std::endl
+        << "- LB=" << std::fixed << std::setprecision(2) << lmax << std::endl
+        << "- UB=" << prob->sol->f << std::endl;
+  }
   *lb = lmax;
   return ret;
 }

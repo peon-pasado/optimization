@@ -3,10 +3,12 @@
 #include <vector>
 #include <cstdlib>
 #include "utils/benv.hpp"
+#include <iostream>
+#include <iomanip>
 
 const double eps = 1e-5;
 const double mem = 1536;
-int verbosity;
+int verbosity = 3;
 
 typedef struct {
   int no;                 /* internal number                                */
